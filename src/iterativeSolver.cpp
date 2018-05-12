@@ -75,7 +75,7 @@ const ClausesAdded IterativeSolver::all_clauses()
     uint32_t numNoDefinition = 0;
     ClausesAdded added;
     for(size_t i = 0; i < anf.getEqs().size(); i++) {
-        const BoolePolynomial& poly = anf.getEqs()[i].poly;
+        const BoolePolynomial& poly = anf.getEqs()[i];
 
         ClausesAdded thisAdded = cnf.addBoolePolynomial(poly);
         added.merge(thisAdded);

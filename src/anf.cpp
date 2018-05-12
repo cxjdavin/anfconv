@@ -57,12 +57,12 @@ ANF::~ANF()
 bool ANF::isSolved() const
 {
     //Evaluate each and every polynomial and check if it's all satisfied
-    for(vector<EqAndName>::const_iterator
+    for(vector<BoolePolynomial>::const_iterator
         it = eqs.begin(), end = eqs.end()
         ; it != end
         ; it++
     ) {
-        lbool ret = evaluatePoly(it->poly, replacer->getValues());
+        lbool ret = evaluatePoly(*it, replacer->getValues());
         if (ret == l_False || ret == l_Undef)
             return false;
     }
@@ -288,7 +288,7 @@ size_t ANF::readFile(
         }
 
         if (addPoly)
-            addBoolePolynomial(EqAndName(eq));
+            addBoolePolynomial(eq);
     }
 
     ifs.close();
@@ -296,11 +296,11 @@ size_t ANF::readFile(
     return maxVar;
 }
 
-void ANF::addBoolePolynomial(const EqAndName& eqPair)
+void ANF::addBoolePolynomial(const BoolePolynomial& poly)
 {
     //If poly is constant, don't add it
-    if (eqPair.poly.isConstant()) {
-        if (eqPair.poly.isOne())
+    if (poly.isConstant()) {
+        if (poly.isOne())
             replacer->setNOTOK();
 
         return;
@@ -308,12 +308,12 @@ void ANF::addBoolePolynomial(const EqAndName& eqPair)
 
     //This will set 'updatedVars' and as such will allow the simplification
     //routine to execute in simplify()
-    bool handled = checkIfPolyUpdatesSomething(eqPair, false);
+    bool handled = checkIfPolyUpdatesSomething(poly, false);
 
     //Not handled above by replacer, add as equation
     if (!handled) {
-        add_poly_to_occur(eqPair.poly, eqs.size());
-        eqs.push_back(eqPair);
+        add_poly_to_occur(poly, eqs.size());
+        eqs.push_back(poly);
     }
 }
 
@@ -347,44 +347,44 @@ void ANF::remove_poly_from_occur(const BoolePolynomial& poly, size_t index)
 //Simplify a single polynomial
 //-> remove from occurance list, update, then add to occurance list
 void ANF::simplifyPolyonomial(
-    EqAndName& eqPair
+    BoolePolynomial& poly
     , const size_t index
     , const bool replace
 ) {
     //If poly is trivial, skip
-    if (eqPair.poly.isConstant()) {
+    if (poly.isConstant()) {
 
         //Check UNSAT
-        if (eqPair.poly.isOne())
+        if (poly.isOne())
             replacer->setNOTOK();
 
         return;
     }
 
-    remove_poly_from_occur(eqPair.poly, index);
+    remove_poly_from_occur(poly, index);
 
     //update equation & representative
-    eqPair.poly = replacer->update(eqPair.poly);
+    poly = replacer->update(poly);
 
-    bool handled = checkIfPolyUpdatesSomething(eqPair, replace);
+    bool handled = checkIfPolyUpdatesSomething(poly, replace);
 
     if (!handled) {
-        add_poly_to_occur(eqPair.poly, index);
+        add_poly_to_occur(poly, index);
     } else {
-        eqPair = EqAndName(BoolePolynomial(*ring));
+        poly = BoolePolynomial(*ring);
     }
 }
 
 bool ANF::checkIfPolyUpdatesSomething(
-    const EqAndName& eqPair
+    const BoolePolynomial& poly
     , const bool replace
 ) {
 
     //check for emptyness
-    if (eqPair.poly.isConstant()) {
+    if (poly.isConstant()) {
 
         //Empty AND UNSAT?
-        if (eqPair.poly.hasConstantPart() == true) {
+        if (poly.hasConstantPart() == true) {
             replacer->setNOTOK();
         }
 
@@ -392,17 +392,17 @@ bool ANF::checkIfPolyUpdatesSomething(
         return true;
     }
 
-    const size_t realTermsSize = eqPair.poly.length() - (int)eqPair.poly.hasConstantPart();
+    const size_t realTermsSize = poly.length() - (int)poly.hasConstantPart();
 
     //check for var-setting
-    if (realTermsSize == 1 && eqPair.poly.deg() == 1) {
-        const BooleMonomial m = eqPair.poly.firstTerm();
+    if (realTermsSize == 1 && poly.deg() == 1) {
+        const BooleMonomial m = poly.firstTerm();
 
         assert(m.deg() == 1);
         uint32_t var = m.firstVariable().index();
 
         //make the update
-        vector<uint32_t> ret = replacer->setValue(var, eqPair.poly.hasConstantPart());
+        vector<uint32_t> ret = replacer->setValue(var, poly.hasConstantPart());
 
         //Mark updated vars
         for(vector<uint32_t>::const_iterator
@@ -419,10 +419,10 @@ bool ANF::checkIfPolyUpdatesSomething(
     //check for equivalence
     if (replace
         && realTermsSize == 2
-        && eqPair.poly.deg() == 1
+        && poly.deg() == 1
     ) {
-        BooleMonomial m1 = eqPair.poly.firstTerm();
-        BooleMonomial m2 = eqPair.poly.terms()[1];
+        BooleMonomial m1 = poly.firstTerm();
+        BooleMonomial m2 = poly.terms()[1];
 
         assert(m1.deg() == 1);
         assert(m2.deg() == 1);
@@ -430,7 +430,7 @@ bool ANF::checkIfPolyUpdatesSomething(
         uint32_t var2 = m2.firstVariable().index();
 
         //Make the update
-        vector<uint32_t> ret = replacer->setReplace(var1, Lit(var2, eqPair.poly.hasConstantPart()));
+        vector<uint32_t> ret = replacer->setReplace(var1, Lit(var2, poly.hasConstantPart()));
         updatedVars.insert(var1);
         updatedVars.insert(var2);
         for(vector<uint32_t>::const_iterator
@@ -445,9 +445,9 @@ bool ANF::checkIfPolyUpdatesSomething(
     }
 
     //Check for a*b*c*.. = 1  --> all vars must be TRUE
-    if (realTermsSize == 1 && eqPair.poly.hasConstantPart()) {
+    if (realTermsSize == 1 && poly.hasConstantPart()) {
         for(BooleMonomial::const_iterator
-            it = eqPair.poly.firstTerm().begin(), end = eqPair.poly.firstTerm().end()
+            it = poly.firstTerm().begin(), end = poly.firstTerm().end()
             ; it != end
             ; it++
         ) {
@@ -527,12 +527,12 @@ void ANF::simplify(const bool replace, bool all)
 
 void ANF::check_simplified_polys_contain_no_set_vars() const
 {
-    for(vector<EqAndName >::const_iterator
+    for(vector<BoolePolynomial>::const_iterator
         it = eqs.begin(), end = eqs.end()
         ; it != end
         ; it++
     ) {
-        const BoolePolynomial& eq = it->poly;
+        const BoolePolynomial& eq = *it;
         for(BooleMonomial::const_iterator
             vit = eq.usedVariables().begin(), vend = eq.usedVariables().end()
             ; vit != vend
@@ -557,14 +557,14 @@ void ANF::check_simplified_polys_contain_no_set_vars() const
 
 void ANF::removeEmptyEquations()
 {
-    vector<EqAndName> new_eqs;
+    vector<BoolePolynomial> new_eqs;
     vector<size_t> occur_delta(eqs.size(), 0);
     for(size_t i = 0; i < eqs.size(); i++) {
-        const EqAndName& eq = eqs[i];
+        const BoolePolynomial& poly = eqs[i];
 
         //If equation is constant zero, don't add to new_eqs
         //and update the occur_delta for all future equations
-        if (eq.poly.isConstant() && !eq.poly.isOne()) {
+        if (poly.isConstant() && !poly.isOne()) {
             for(size_t i2 = i; i2 < eqs.size(); i2++) {
                 occur_delta[i2]++;
             }
@@ -572,7 +572,7 @@ void ANF::removeEmptyEquations()
         }
 
         //Not constant zero, so add
-        new_eqs.push_back(eq);
+        new_eqs.push_back(poly);
     }
 
     //Go through each variable occurance
@@ -599,15 +599,15 @@ void ANF::removeEmptyEquations()
 bool ANF::evaluate(const vector<lbool>& vals) const
 {
     bool ret = true;
-    for(vector<EqAndName >::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
-        lbool lret = evaluatePoly(it->poly, vals);
+    for(vector<BoolePolynomial>::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
+        lbool lret = evaluatePoly(*it, vals);
         assert(lret != l_Undef);
 
         //OOps, grave bug in implmenetation
         if (lret != l_True) {
             cout
             << "Internal ERROR! Solution doesn't satisfy eq '"
-            << it->poly << "'"
+            << *it << "'"
             << endl;
             exit(-1);
         }
@@ -753,7 +753,7 @@ ANF* ANF::minimise(
     BoolePolyRing* newring = new BoolePolyRing(unknown.size());
     ANF* newanf = new ANF(newring, config);
 
-    for(vector<EqAndName>::const_iterator
+    for(vector<BoolePolynomial>::const_iterator
         it = eqs.begin(), end = eqs.end()
         ; it != end
         ; it++
@@ -762,7 +762,7 @@ ANF* ANF::minimise(
 
         //Update poly
         for(BoolePolynomial::const_iterator
-            it2 = it->poly.begin(), end2 = it->poly.end()
+            it2 = it->begin(), end2 = it->end()
             ; it2 != end2
             ; it2++
         ) {
@@ -784,9 +784,8 @@ ANF* ANF::minimise(
         }
 
 
-        newanf->addBoolePolynomial(EqAndName(newpoly));
+        newanf->addBoolePolynomial(newpoly);
     }
 
     return newanf;
 }
-

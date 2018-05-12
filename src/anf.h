@@ -44,7 +44,6 @@ THE SOFTWARE.
 
 USING_NAMESPACE_PBORI
 
-#include "eqandname.h"
 class Replacer;
 
 using std::map;
@@ -77,7 +76,7 @@ class ANF
         size_t getNumReplacedVars() const;
         size_t getNumSetVars() const;
         bool getOK() const;
-        const vector<EqAndName>& getEqs() const;
+        const vector<BoolePolynomial>& getEqs() const;
         size_t getNumSimpleXors() const;
         void extractVariables(
             const size_t from
@@ -96,7 +95,7 @@ class ANF
         void printStats(int verbosity) const;
 
         //Set functions
-        void addBoolePolynomial(const EqAndName& eq);
+        void addBoolePolynomial(const BoolePolynomial& poly);
 
         //More advanced state-querying functions
         bool evaluate(const vector<lbool>& vals) const;
@@ -110,11 +109,11 @@ class ANF
         void add_poly_to_occur(const BoolePolynomial& poly, size_t index);
         void remove_poly_from_occur(const BoolePolynomial& poly, size_t index);
         bool checkIfPolyUpdatesSomething(
-            const EqAndName& eqPair
+            const BoolePolynomial& poly
             , const bool replace
         );
         void simplifyPolyonomial(
-            EqAndName& eqPair
+            BoolePolynomial& poly
             , const size_t index
             , const bool replace
         );
@@ -129,7 +128,7 @@ class ANF
         vector<string> comments;
 
         //State
-        vector<EqAndName > eqs;
+        vector<BoolePolynomial> eqs;
         Replacer* replacer;
         vector<vector<size_t> > occur; //occur[var] -> index of polys where the variable occurs
         set<uint32_t> updatedVars; //When a polynomial updates some var's definition, this set is updated. Used during simplify & addBoolePolynomial
@@ -155,8 +154,8 @@ inline const BoolePolyRing& ANF::getRing() const
 inline size_t ANF::numMonoms() const
 {
     size_t num = 0;
-    for(vector<EqAndName >::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
-        num += it->poly.length();
+    for(vector<BoolePolynomial>::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
+        num += it->length();
     }
     return num;
 }
@@ -164,13 +163,13 @@ inline size_t ANF::numMonoms() const
 inline size_t ANF::deg() const
 {
     int deg = 0;
-    for(vector<EqAndName >::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
-        deg = std::max(deg, it->poly.deg());
+    for(vector<BoolePolynomial>::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
+        deg = std::max(deg, it->deg());
     }
     return deg;
 }
 
-inline const vector<EqAndName >& ANF::getEqs() const
+inline const vector<BoolePolynomial>& ANF::getEqs() const
 {
     return eqs;
 }
@@ -178,8 +177,8 @@ inline const vector<EqAndName >& ANF::getEqs() const
 inline size_t ANF::getNumSimpleXors() const
 {
     size_t num = 0;
-    for(vector<EqAndName>::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
-        num += (it->poly.deg() == 1);
+    for(vector<BoolePolynomial>::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
+        num += (it->deg() == 1);
     }
 
     return num;
@@ -203,13 +202,13 @@ inline std::ostream& operator<<(std::ostream& os, const ANF& anf)
 
     //print equations
     size_t i = 0;
-    for (vector<EqAndName >::const_iterator
+    for (vector<BoolePolynomial>::const_iterator
             it = anf.eqs.begin(), end = anf.eqs.end()
             ; it != end
             ; it++, i++
         ) {
 
-        os << it->poly;
+        os << *it;
         os << endl;
     }
 

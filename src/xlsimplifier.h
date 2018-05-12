@@ -45,17 +45,17 @@ class XLSimplifier
             assert(mzd_is_zero(mat));
 
             size_t num = 0;
-            for (vector<EqAndName>::const_iterator
+            for (vector<BoolePolynomial>::const_iterator
                 it = anf.getEqs().begin(), end = anf.getEqs().end()
                 ; it != end
                 ; it++, num++
             ) {
                 //If degree of poly is too large, don't include it
-                if (it->poly.deg() > upToDeg)
+                if (it->deg() > upToDeg)
                     continue;
 
                 for(BoolePolynomial::const_iterator
-                    it2 = it->poly.begin(), end2 = it->poly.end()
+                    it2 = it->begin(), end2 = it->end()
                     ; it2 != end2
                     ; it2++
                 ) {
@@ -69,7 +69,7 @@ class XLSimplifier
                     uint32_t intVar = it3->second;
                     mzd_write_bit(mat, num, intVar, true);
                 }
-                mzd_write_bit(mat, num, nextVar, it->poly.hasConstantPart());
+                mzd_write_bit(mat, num, nextVar, it->hasConstantPart());
             }
         }
 
@@ -105,18 +105,18 @@ class XLSimplifier
     private:
         void buildMaps(const ANF& anf, const int upToDeg)
         {
-            const vector<EqAndName >& eqs = anf.getEqs();
-            for(vector<EqAndName >::const_iterator
+            const vector<BoolePolynomial>& eqs = anf.getEqs();
+            for(vector<BoolePolynomial>::const_iterator
                 it = eqs.begin(), end = eqs.end()
                 ; it != end
                 ; it++
             ) {
                 //Don't include polys with higher-than-requested degree
-                if (it->poly.deg() > upToDeg)
+                if (it->deg() > upToDeg)
                     continue;
 
                 for(BoolePolynomial::const_iterator
-                    it2 = it->poly.begin(), end2 = it->poly.end()
+                    it2 = it->begin(), end2 = it->end()
                     ; it2 != end2
                     ; it2++
                 ) {

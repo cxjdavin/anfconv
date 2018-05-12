@@ -93,9 +93,9 @@ void CNF::addAllEquations()
     add_trivial_equations();
 
     //Add regular equations
-    const vector<EqAndName>& eqs = anf.getEqs();
-    for (vector<EqAndName>::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
-        addBoolePolynomial(it->poly);
+    const vector<BoolePolynomial>& eqs = anf.getEqs();
+    for (vector<BoolePolynomial>::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
+        addBoolePolynomial(*it);
     }
 }
 

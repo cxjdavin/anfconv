@@ -263,7 +263,7 @@ bool XLSimplifier::simplify(
         if (config.verbosity >= 2) {
             cout << "New truth: " << *it << endl;
         }
-        addNewTruthsHere.addBoolePolynomial(EqAndName(*it));
+        addNewTruthsHere.addBoolePolynomial(*it);
     }
 
     cout << "c Time to for XL: " << (cpuTime() - myTime) << endl;

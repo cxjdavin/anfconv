@@ -93,7 +93,7 @@ void SimplifyBySat::extractUnitaries()
         if (config.verbosity >= 2) {
             cout << "New truth: " << poly << endl;
         }
-        anf.addBoolePolynomial(EqAndName(poly));
+        anf.addBoolePolynomial(poly);
 
         numRealVarLearnt++;
     }
@@ -133,7 +133,7 @@ void SimplifyBySat::extractBinXors()
         if (config.verbosity >= 2) {
             cout << "New truth: " << poly << endl;
         }
-        anf.addBoolePolynomial(EqAndName(poly));
+        anf.addBoolePolynomial(poly);
 
         numRealVarReplaced++;
     }
@@ -170,7 +170,7 @@ bool SimplifyBySat::simplify(const bool extractBinaries)
 
     if (ret == l_False) {
         cout << "c UNSAT returned by solver" << endl;
-        anf.addBoolePolynomial(EqAndName(BoolePolynomial(true, anf.getRing())));
+        anf.addBoolePolynomial(BoolePolynomial(true, anf.getRing()));
 
         return false;
     }
