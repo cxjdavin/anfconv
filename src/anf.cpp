@@ -625,16 +625,18 @@ bool ANF::evaluate(const vector<lbool>& vals) const
 
 void ANF::printStats(int verbosity) const
 {
-    cout << "c ---- ANF stats -----" << endl;
-    cout << "c Num total vars: " << getNumVars() << endl;
-    cout << "c Num free vars: " << replacer->getNumUnknownVars() << endl;
-    cout << "c Num equations: " << size() << endl;
-    cout << "c Num monoms in eqs: " << numMonoms() << endl;
-    cout << "c Max deg in eqs: " << deg() << endl;
-    cout << "c Simple XORs: " << getNumSimpleXors() << endl;
-    cout << "c Num vars set: " << getNumSetVars() << endl;
-    cout << "c Num vars replaced: " << getNumReplacedVars() << endl;
-    cout << "c --------------------" << endl;
+    if (verbosity >= 1) {
+        cout << "c ---- ANF stats -----" << endl;
+        cout << "c Num total vars: " << getNumVars() << endl;
+        cout << "c Num free vars: " << replacer->getNumUnknownVars() << endl;
+        cout << "c Num equations: " << size() << endl;
+        cout << "c Num monoms in eqs: " << numMonoms() << endl;
+        cout << "c Max deg in eqs: " << deg() << endl;
+        cout << "c Simple XORs: " << getNumSimpleXors() << endl;
+        cout << "c Num vars set: " << getNumSetVars() << endl;
+        cout << "c Num vars replaced: " << getNumReplacedVars() << endl;
+        cout << "c --------------------" << endl;
+    }
 }
 
 /**
