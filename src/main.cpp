@@ -35,10 +35,8 @@ namespace po = boost::program_options;
 #include "simplifybysat.h"
 #include "replacer.h"
 #include "GitSHA1.h"
-#include <boost/scoped_ptr.hpp>
 #include <memory>
 #include <deque>
-using std::unique_ptr;
 
 //#define DEBUG_EXTRACTION
 using std::cout;
@@ -277,8 +275,8 @@ uint32_t get_var(const string var_num, const uint32_t max_var)
 
 size_t get_ringsize(const string anf_filename)
 {
-    unique_ptr<BoolePolyRing> ring(new BoolePolyRing(1));
-    unique_ptr<ANF> anf(new ANF(ring.get(), config));
+    BoolePolyRing* ring = new BoolePolyRing(1);
+    ANF* anf = new ANF(ring, config);
     const size_t ring_size = anf->readFile(anf_filename, false);
     cout << "--> Needed ring size is " << ring_size+1 << endl;
 
@@ -495,4 +493,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
