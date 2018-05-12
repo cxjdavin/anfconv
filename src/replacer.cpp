@@ -63,6 +63,22 @@ bool Replacer::evaluate(const vector<lbool>& vals) const
     return ret;
 }
 
+/*
+ * Suppose monomial is a*b*c and we want to replace:
+ *   a with 1+d
+ *   b with e
+ *   c with 1+f
+ * (Note: e may be b itself)
+ *
+ * init   : ret = 1
+ * after a: ret = (d) + (1)
+ *              = d + 1
+ * after b: ret = e*d + e
+ * after c: ret = (f*e*d + f*e) + (e*d + e)
+ *              = f*e*d + f*e + e*d + e
+ *              = (1+d)*(e)*(1+f)
+ *              = a*b*c
+ */
 BoolePolynomial Replacer::update(const BooleMonomial& m) const
 {
     BoolePolynomial ret(true, m.ring());
@@ -429,4 +445,3 @@ ANF& ANF::operator= (const ANF& other)
     occur = other.occur;
     return *this;
 }
-
