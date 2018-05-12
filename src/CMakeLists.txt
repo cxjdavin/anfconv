@@ -1,7 +1,7 @@
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/GitSHA1.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/GitSHA1.cpp" @ONLY)
 set(anfconv_public_headers "")
 
-add_library(libanfconv SHARED
+add_library(libanfconv
     anf.cpp
     cnf.cpp
     karnaugh.cpp

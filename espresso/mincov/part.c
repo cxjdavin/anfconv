@@ -13,7 +13,7 @@ register sm_row *prow;
     }
 }
 
-static int visit_col(A, pcol, rows_visited, cols_visited);
+static int visit_col(sm_matrix *A, sm_col *pcol, int *rows_visited, int *cols_visited);
 
 static int
 visit_row(A, prow, rows_visited, cols_visited)
@@ -71,7 +71,7 @@ int *cols_visited;
     }
     return 0;
 }
-
+
 int
 sm_block_partition(A, L, R)
 sm_matrix *A;
