@@ -7,7 +7,6 @@ add_library(libanfconv
     karnaugh.cpp
     satsolve.cpp
     simplifybysat.cpp
-    xlsimplifier.cpp
     iterativeSolver.cpp
     replacer.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/GitSHA1.cpp

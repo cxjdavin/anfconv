@@ -62,7 +62,10 @@ class ANF
         ANF(polybori::BoolePolyRing* _ring, ConfigData& _config);
         ~ANF();
         size_t readFile(const std::string& filename, const bool addPoly);
-        void simplify(const bool replace, bool all = false);
+
+        void propagate();
+        void simplify();
+        bool eliminate_linear();
 
         vector<lbool> extendSolution(const vector<lbool>& solution) const;
 
@@ -106,17 +109,9 @@ class ANF
         ANF& operator= (const ANF& other);
 
     private:
-        void add_poly_to_occur(const BoolePolynomial& poly, size_t index);
-        void remove_poly_from_occur(const BoolePolynomial& poly, size_t index);
-        bool checkIfPolyUpdatesSomething(
-            const BoolePolynomial& poly
-            , const bool replace
-        );
-        void simplifyPolyonomial(
-            BoolePolynomial& poly
-            , const size_t index
-            , const bool replace
-        );
+        void add_poly_to_occur(const BoolePolynomial& poly, size_t eq_idx);
+        void remove_poly_from_occur(const BoolePolynomial& poly, size_t eq_idx);
+        void simplifyPolynomial(BoolePolynomial& poly, const size_t eq_idx);
         void removeEmptyEquations();
         void check_simplified_polys_contain_no_set_vars() const;
 

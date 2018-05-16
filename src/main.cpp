@@ -26,7 +26,7 @@ namespace po = boost::program_options;
 
 #include "anf.h"
 #include "cnf.h"
-#include "xlsimplifier.h"
+#include "gaussjordan.h"
 #include <fstream>
 #include <sys/wait.h>
 #include "time_mem.h"
@@ -61,8 +61,10 @@ bool doSolveSAT; //Solve using CryptoMiniSat
 int renumber_ring_vars;
 
 //How to simplify
+bool doANFSimplify;
+bool doGJSimplify;
 bool doXLSimplify;
-int doANFSimplify = 1; //NOTE: Things WILL break if this is not enabled
+bool doElimLinSimplify;
 bool doSATSimplify;
 
 //Parameters
@@ -95,12 +97,16 @@ void parseOptions(int argc, char *argv[])
         , "Verbosity setting (0 = silent)")
     ("dump,d", po::bool_switch(&config.writePNG)
          , "Dump XL's and linearization's matrixes as PNG files")
-    ("anfsimp", po::value(&doANFSimplify)->default_value(1)
-        , "Simply ANF before doing anything")
-    ("satsimp", po::bool_switch(&doSATSimplify)
-        , "Simplify using SAT")
+    ("anfsimp", po::bool_switch(&doANFSimplify)
+         , "Simply ANF before doing anything")
+    ("gjsimp", po::bool_switch(&doGJSimplify)
+         , "Simplify using GaussJordan")
     ("xlsimp", po::bool_switch(&doXLSimplify)
-        , "Simplify using XL")
+         , "Simplify using XL (performs GaussJordan internally)")
+    ("elimlinsimp", po::bool_switch(&doElimLinSimplify)
+         , "Simplify using ElimLin (performs GaussJordan internally)")
+    ("satsimp", po::bool_switch(&doSATSimplify)
+         , "Simplify using SAT")
     ("confl", po::value<uint64_t>(&numConfl)->default_value(20000)
         , "Conflict limit for built-in SAT solver")
     ("cutnum", po::value(&config.cutNum)->default_value(config.cutNum)
@@ -286,13 +292,20 @@ size_t get_ringsize(const string anf_filename)
 void simplify(ANF* anf, const ANF& orig_anf)
 {
     if (config.verbosity>=1) {
-        cout << "Simple simplifying of ANF..." << std::flush;
+        cout << "Simple simplifying of ANF..." << endl
+             << "ANF simp: " << doANFSimplify << endl
+             << "GJ simp: " << doGJSimplify << endl
+             << "XL simp: " << doXLSimplify << endl
+             << "EL simp: " << doElimLinSimplify << endl
+             << "SAT simp: " << doSATSimplify << endl;
     }
 
     bool changed = true;
     uint32_t numIters = 0;
     double myTime = cpuTime();
-    while (true) {
+    while (changed) {
+        changed = false;
+
         uint64_t prev_set_vars = anf->getNumSetVars();
         uint64_t prev_eq_num = anf->size();
         uint64_t prev_monom_in_eq = anf->numMonoms();
@@ -300,21 +313,82 @@ void simplify(ANF* anf, const ANF& orig_anf)
         uint64_t prev_simp_xors = anf->getNumSimpleXors();
         uint64_t prev_replaced_vars = anf->getNumReplacedVars();
 
-        if (doANFSimplify) {
-            anf->simplify(config.anfReplaceVars, true);
-            //anf->simplify(config.anfReplaceVars, true);
+        // Basic propagation
+        anf->propagate();
 
-            if (config.verbosity>=1) {
-                cout
-                << "c Done." << endl;
-                if (config.verbosity >= 1) {
-                    cout<< "c Time to read&simplify ANF: "
-                    << std::fixed << std::setprecision(2) << (cpuTime() - myTime)
-                    << endl
-                    << "New stats:" << endl;
-                    anf->printStats(config.verbosity);
+        // Apply ANF simplification
+        if (doANFSimplify) {
+            anf->simplify();
+            anf->propagate();
+        }
+
+        // Apply Gauss Jordan simplification
+        if (doGJSimplify) {
+            // Add and print new truths found
+            vector<BoolePolynomial> newTruths;
+            GaussJordan gj(anf->getEqs(), anf->getRing(), config, -1);
+            changed |= gj.run(newTruths);
+            for(BoolePolynomial poly : newTruths) {
+                anf->addBoolePolynomial(poly);
+            }
+            anf->propagate();
+        }
+
+        // Apply XL simplification (includes Gauss Jordan)
+        if (doXLSimplify) {
+            // For now, only extend by degree 1 monomials
+            vector<BoolePolynomial> equations;
+            for (const BoolePolynomial& poly : anf->getEqs()) {
+                equations.push_back(poly);
+            }
+            for (unsigned long i = 0; i < anf->getRing().nVariables(); ++i) {
+                BooleVariable v = anf->getRing().variable(i);
+                for (const BoolePolynomial& poly : anf->getEqs()) {
+                    equations.push_back(BoolePolynomial(v * poly));
                 }
             }
+
+            // Add and print new truths found
+            vector<BoolePolynomial> newTruths;
+            GaussJordan gj(equations, anf->getRing(), config, -1);
+            changed |= gj.run(newTruths);
+            for(BoolePolynomial poly : newTruths) {
+                anf->addBoolePolynomial(poly);
+            }
+            anf->propagate();
+        }
+
+        // Apply ElimLin simplification (includes Gauss Jordan)
+        if (doElimLinSimplify) {
+            bool fixed_point = false;
+            while (!fixed_point) {
+                cout << *anf << endl;
+                bool eliminated_something = anf->eliminate_linear();
+                cout << *anf << endl;
+                cout << "EL DONE\n";
+
+                // Add and print new truths found
+                vector<BoolePolynomial> newTruths;
+                GaussJordan gj(anf->getEqs(), anf->getRing(), config, -1);
+                bool new_gj_truth = gj.run(newTruths);
+                for(BoolePolynomial poly : newTruths) {
+                    anf->addBoolePolynomial(poly);
+                }
+                cout << "GAUSS DONE\n";
+
+                changed |= (eliminated_something || new_gj_truth);
+                fixed_point = (!eliminated_something && !new_gj_truth);
+            }
+
+            anf->propagate();
+            cout << *anf << endl;
+        }
+
+        // Apply SAT simplification (run CMS, then extract learnt clauses)
+        if (doSATSimplify) {
+            SimplifyBySat simpsat(*anf, orig_anf, config, numConfl);
+            changed |= simpsat.simplify();
+            anf->propagate();
         }
 
         uint64_t set_vars = anf->getNumSetVars();
@@ -324,32 +398,12 @@ void simplify(ANF* anf, const ANF& orig_anf)
         uint64_t simp_xors = anf->getNumSimpleXors();
         uint64_t replaced_vars = anf->getNumReplacedVars();
 
-        if (set_vars == prev_set_vars &&
-            eq_num == prev_eq_num &&
-            monom_in_eq == prev_monom_in_eq &&
-            deg == prev_deg &&
-            simp_xors == prev_simp_xors &&
-            replaced_vars == prev_replaced_vars
-        ) {
-            break;
-        }
-
-        if (doSATSimplify) {
-            cout << "c Simplifying using SAT solver" << endl;
-            SimplifyBySat simpsat(*anf, orig_anf, config, numConfl);
-            simpsat.simplify();
-            changed = true;
-            cout << "c Done simplifying with SAT solver." << endl;
-        }
-
-        //XL simplification
-        if (doXLSimplify) {
-            XLSimplifier xl(*anf, 2);
-            xl.simplify(*anf, numIters, config);
-            cout << "Simplifying ANF with XL..." << std::flush;
-            changed |= xl.simplify(*anf, numIters, config);
-            cout << "Done." << endl;
-        }
+        changed |= (set_vars != prev_set_vars ||
+                    eq_num != prev_eq_num ||
+                    monom_in_eq != prev_monom_in_eq ||
+                    deg != prev_deg ||
+                    simp_xors != prev_simp_xors ||
+                    replaced_vars != prev_replaced_vars);
         numIters++;
     }
 }
@@ -370,7 +424,7 @@ void write_anf(ANF* anf)
         anf->preferLowVars();
         vector<uint32_t> oldToNew;
         vector<uint32_t> newToOld;
-         newanf = anf->minimise(oldToNew, newToOld);
+        newanf = anf->minimise(oldToNew, newToOld);
     } else {
         newanf = anf;
     }
@@ -437,11 +491,7 @@ void perform_all_operations(const string anf_filename) {
 
     //Simplification(s), recursively
     ANF orig_anf(*anf);
-    if (doANFSimplify || doSATSimplify|| doXLSimplify) {
-        simplify(anf, orig_anf);
-    }
-
-    // Print solution
+    simplify(anf, orig_anf);
     cout << *anf << endl;
 
     //Writing simplified ANF
