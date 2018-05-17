@@ -346,33 +346,8 @@ void ANF::simplifyPolynomial(BoolePolynomial& poly, const size_t eq_idx) {
             replacer->setNOTOK();
         }
     } else {
-        bool removePoly = false;
-
-        // If polynomial is "x + y = 0" or "x + y + 1 = 0", set the value of x in terms of y
-        if (poly.length() - (int)poly.hasConstantPart() == 2 && poly.deg() == 1) {
-            removePoly = true;
-            BooleMonomial m1 = poly.firstTerm(); // = poly.terms()[0]
-            BooleMonomial m2 = poly.terms()[1];
-
-            assert(m1.deg() == 1);
-            assert(m2.deg() == 1);
-            uint32_t var1 = m1.firstVariable().index();
-            uint32_t var2 = m2.firstVariable().index();
-
-            //Make the update
-            vector<uint32_t> ret = replacer->setReplace(var1, Lit(var2, poly.hasConstantPart()));
-            updatedVars.insert(var1);
-            updatedVars.insert(var2);
-
-            // Mark updated vars
-            for (const uint32_t& var_idx : ret) {
-                updatedVars.insert(var_idx);
-            }
-        }
-
         // If polynomial is "a*b*c*.. + 1 = 0", then all variables must be TRUE
         if (poly.length() == 2 && poly.hasConstantPart()) {
-            removePoly = true;
             for (const uint32_t& var_idx : poly.firstTerm()) {
                 //Make the update
                 vector<uint32_t> ret = replacer->setValue(var_idx, true);
@@ -382,9 +357,8 @@ void ANF::simplifyPolynomial(BoolePolynomial& poly, const size_t eq_idx) {
                     updatedVars.insert(var_idx2);
                 }
             }
-        }
 
-        if (removePoly) {
+            // Zero out this polynomial
             remove_poly_from_occur(poly, eq_idx);
             poly = BoolePolynomial(*ring);
         }
@@ -418,14 +392,36 @@ void ANF::propagate() {
                         return;
                     }
                 } else {
-                    // If polynomial is "x = 0" or "x + 1 = 0", set the value of x
                     if (poly.length() - (int)poly.hasConstantPart() == 1 && poly.deg() == 1) {
+                        // If polynomial is "x = 0" or "x + 1 = 0", set the value of x
                         uint32_t v = poly.usedVariables().firstVariable().index();
                         vector<uint32_t> ret = replacer->setValue(v, poly.hasConstantPart());
 
                         //Mark updated vars
                         for (const uint32_t& updated_var : ret) {
                             updatedVars.insert(updated_var);
+                        }
+
+                        // Zero out this polynomial
+                        poly = BoolePolynomial(*ring);
+                    } else if (poly.length() - (int)poly.hasConstantPart() == 2 && poly.deg() == 1) {
+                        // If polynomial is "x + y = 0" or "x + y + 1 = 0", set the value of x in terms of y
+                        BooleMonomial m1 = poly.firstTerm(); // = poly.terms()[0]
+                        BooleMonomial m2 = poly.terms()[1];
+
+                        assert(m1.deg() == 1);
+                        assert(m2.deg() == 1);
+                        uint32_t var1 = m1.firstVariable().index();
+                        uint32_t var2 = m2.firstVariable().index();
+
+                        //Make the update
+                        vector<uint32_t> ret = replacer->setReplace(var1, Lit(var2, poly.hasConstantPart()));
+                        updatedVars.insert(var1);
+                        updatedVars.insert(var2);
+
+                        // Mark updated vars
+                        for (const uint32_t& var_idx : ret) {
+                            updatedVars.insert(var_idx);
                         }
 
                         // Zero out this polynomial
