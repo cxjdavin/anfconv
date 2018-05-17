@@ -4,7 +4,7 @@ An ANF simplification tool forked from: https://github.com/msoos/anfconv
 # Installation
 
 ### m4ri
-From https://bitbucket.org/malb/m4ri/downloads/, download "m4ri-20140914.tar.gz"
+From https://bitbucket.org/malb/m4ri/downloads/, download `m4ri-20140914.tar.gz`
 
 ```
 tar -xf m4ri-20140914.tar.gz
@@ -15,7 +15,7 @@ sudo make install
 ```
 
 ### PolyBoRi
-From https://sourceforge.net/projects/polybori/files/polybori/0.8.3/, download "polybori-0.8.3.tar.gz"
+From https://sourceforge.net/projects/polybori/files/polybori/0.8.3/, download `polybori-0.8.3.tar.gz`
 ```
 tar -xf polybori-0.8.3.tar.gz
 cd polybori-0.8.3
