@@ -37,12 +37,14 @@ class SimplifyBySat
         SimplifyBySat(ANF& anf, const ANF& orig_anf, ConfigData& _config, uint64_t max_confl);
         ~SimplifyBySat();
 
-        bool simplify(const bool _extractBinaries = true);
+        bool simplify();
 
     private:
         void addClausesToSolver();
         void extractUnitaries();
         void extractBinXors();
+        void extractXors();
+        void addNewPolynomial(const pair<vector<uint32_t>, bool>& cnf_poly);
 
         //Main data
         ANF& anf;

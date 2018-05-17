@@ -142,7 +142,35 @@ void SimplifyBySat::extractBinXors()
         cout << "c Num ANF vars replaced: " << numRealVarReplaced << endl;
 }
 
-bool SimplifyBySat::simplify(const bool extractBinaries)
+void SimplifyBySat::addNewPolynomial(
+    const pair<vector<uint32_t>, bool>& cnf_poly
+) {
+    BoolePolynomial new_poly(cnf_poly.second, anf.getRing());
+    for (const uint32_t& var_idx : cnf_poly.first) {
+        BooleVariable new_var(var_idx, anf.getRing());
+        new_poly += new_var;
+    }
+    anf.addBoolePolynomial(new_poly);
+}
+
+void SimplifyBySat::extractXors()
+{
+    int num_new_polys;
+    for (const pair<vector<uint32_t>, bool>& cnf_poly : solver->get_recovered_xors(false)) {
+      addNewPolynomial(cnf_poly);
+      num_new_polys++;
+    }
+    for (const pair<vector<uint32_t>, bool>& cnf_poly : solver->get_recovered_xors(true)) {
+      addNewPolynomial(cnf_poly);
+      num_new_polys++;
+    }
+
+    if (config.verbosity >= 1) {
+        cout << "c CNF yielded " << num_new_polys << " new XOR equations" << endl;
+    }
+}
+
+bool SimplifyBySat::simplify()
 {
     if (!anf.getOK()) {
         cout << "Nothing to simplify: UNSAT" << endl;
@@ -162,8 +190,8 @@ bool SimplifyBySat::simplify(const bool extractBinaries)
 
     //Extract data
     extractUnitaries();
-    if (extractBinaries)
-        extractBinXors();
+    extractBinXors();
+    extractXors();
 
     if (ret == l_Undef)
         return newTruthAdded;
