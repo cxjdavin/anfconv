@@ -41,10 +41,11 @@ class GaussJordan
                     const ConfigData& config,
                     const int upToDeg = -1) :
                 equations(equations), ring(ring), config(config), nextVar(0) {
-            printf("RUNNING GAUSS\n");
             buildMaps(equations, upToDeg);
             mat = mzd_init(equations.size(), nextVar+1);
             assert(mzd_is_zero(mat));
+
+            cout << "Matrix size: " << mat->nrows << " x " << mat->ncols << endl;
 
             size_t num = 0;
             for (const BoolePolynomial& poly : equations) {
@@ -84,7 +85,6 @@ class GaussJordan
         }
 
         bool run(vector<BoolePolynomial>& newTruths) {
-            cout << "Running gauss jordan\n";
             double myTime = cpuTime();
             //printMatrix();
             vector<BoolePolynomial>* truths = findTruths(); // Perform Gauss Jordan elimination
@@ -101,13 +101,13 @@ class GaussJordan
                     newTruths.push_back(poly);
                 }
             }
-            cout << "Found " << newTruths.size() << " new truth(s)" << endl;
+            cout << "Gauss Jordan found " << newTruths.size() << " new truth(s)"
+                 << " in " << (cpuTime() - myTime) << " seconds" << endl;
             if (config.verbosity >= 2) {
                 for(const BoolePolynomial& poly : newTruths) {
                     cout << "New truth: " << poly << endl;
                 }
             }
-            cout << "c Time to perform Gauss Jordan: " << (cpuTime() - myTime) << endl;
             return !newTruths.empty();
         }
 

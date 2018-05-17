@@ -512,6 +512,10 @@ void perform_all_operations(const string anf_filename) {
     if (doSolveSAT || writeCNF) {
         solve_by_sat(anf, orig_anf);
     }
+
+    if (config.verbosity >= 1) {
+        anf->printStats(config.verbosity);
+    }
 }
 
 int main(int argc, char *argv[])
