@@ -78,7 +78,7 @@ c UNSAT : false
 ```
 Explanation of simplification done:
 * The first linear polynomial rearranged to `x1 = x2 + x3` to eliminate x1 from the other equations (in this case, there is only one other equation)
-* The second polynomial becomes `(x2 + x3) \* x2 + x2 \* x3 + 1 = 0`, which simplifies to `x2 + 1 = 0`
+* The second polynomial becomes `(x2 + x3) * x2 + x2 * x3 + 1 = 0`, which simplifies to `x2 + 1 = 0`
 * Then, further simplification by substituting `x2 + 1 = 0` yields `x1 + x3 + 1 = 0`
 
 
