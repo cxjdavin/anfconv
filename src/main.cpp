@@ -61,10 +61,11 @@ bool doSolveSAT; //Solve using CryptoMiniSat
 int renumber_ring_vars;
 
 //How to simplify
+bool doAllSimplify;
 bool doANFSimplify;
 bool doGJSimplify;
 bool doXLSimplify;
-bool doElimLinSimplify;
+bool doELSimplify;
 bool doSATSimplify;
 
 //Parameters
@@ -97,13 +98,15 @@ void parseOptions(int argc, char *argv[])
         , "Verbosity setting (0 = silent)")
     ("dump,d", po::bool_switch(&config.writePNG)
          , "Dump XL's and linearization's matrixes as PNG files")
+    ("allsimp", po::bool_switch(&doAllSimplify)
+         , "Apply all simplification tricks")
     ("anfsimp", po::bool_switch(&doANFSimplify)
-         , "Simply ANF before doing anything")
+         , "Simplify ANF before doing anything")
     ("gjsimp", po::bool_switch(&doGJSimplify)
          , "Simplify using GaussJordan")
     ("xlsimp", po::bool_switch(&doXLSimplify)
          , "Simplify using XL (performs GaussJordan internally)")
-    ("elimlinsimp", po::bool_switch(&doElimLinSimplify)
+    ("elsimp", po::bool_switch(&doELSimplify)
          , "Simplify using ElimLin (performs GaussJordan internally)")
     ("satsimp", po::bool_switch(&doSATSimplify)
          , "Simplify using SAT")
@@ -291,12 +294,19 @@ size_t get_ringsize(const string anf_filename)
 
 void simplify(ANF* anf, const ANF& orig_anf)
 {
+    if (doAllSimplify) {
+        doANFSimplify = true;
+        doGJSimplify = true;
+        doXLSimplify = true;
+        doELSimplify = true;
+        doSATSimplify = true;
+    }
     if (config.verbosity>=1) {
         cout << "Simple simplifying of ANF..." << endl
              << "ANF simp: " << doANFSimplify << endl
              << "GJ simp: " << doGJSimplify << endl
              << "XL simp: " << doXLSimplify << endl
-             << "EL simp: " << doElimLinSimplify << endl
+             << "EL simp: " << doELSimplify << endl
              << "SAT simp: " << doSATSimplify << endl;
     }
 
@@ -359,7 +369,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
         }
 
         // Apply ElimLin simplification (includes Gauss Jordan)
-        if (doElimLinSimplify) {
+        if (doELSimplify) {
             bool fixed_point = false;
             while (!fixed_point) {
                 cout << *anf << endl;
