@@ -45,7 +45,7 @@ make -j4
 ```
 You can now run using the executable `anfconv` in the `build` directory.
 
-### For testing: [lit](https://github.com/llvm-mirror/llvm/tree/master/utils/lit) and [OutputCheck](https://github.com/stp/OutputCheck)
+### For testing: [LLVM lit](https://github.com/llvm-mirror/llvm/tree/master/utils/lit) and [stp OutputCheck](https://github.com/stp/OutputCheck)
 ```
 pip install lit
 pip install OutputCheck
