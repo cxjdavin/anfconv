@@ -153,7 +153,7 @@ size_t ANF::readFile(
                 continue;
             }
 
-            if (temp[i] == 'x') {
+            if (temp[i] == 'x' || temp[i] == 'X') {
                 startOfVar = true;
                 readInVar = false;
                 continue;
