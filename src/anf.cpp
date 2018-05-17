@@ -373,15 +373,17 @@ void ANF::propagate() {
         updatedVars.clear();
         for (const uint32_t& var_idx : updatedVars_snapshot) {
             assert(occur.size() > var_idx);
-            cout << "Updating variable " << var_idx << endl;
-
+            if (config.verbosity >= 2) {
+                cout << "Updating variable " << var_idx << endl;
+            }
             // We will remove and add stuff to occur, so iterate over a snapshot
             const vector<size_t> occur_snapshot = occur[var_idx];
             for (const size_t& eq_idx : occur_snapshot) {
                 assert(eqs.size() > eq_idx);
                 BoolePolynomial& poly = eqs[eq_idx];
-
-                cout << "  equation: " << poly << endl;
+                if (config.verbosity >= 2) {
+                    cout << "  equation: " << poly << endl;
+                }
                 remove_poly_from_occur(poly, eq_idx);
                 poly = replacer->update(poly);
 
@@ -707,7 +709,10 @@ bool ANF::eliminate_linear() {
             // Add polynomial back later
             to_add_back.push_back(linear_eq);
         }
-        cout << "Replacing " << linear_eq.firstTerm().firstVariable() << " with " << poly_to_replace << endl;
+        if (config.verbosity >= 2) {
+            cout << "Replacing " << linear_eq.firstTerm().firstVariable()
+                 << " with " << poly_to_replace << endl;
+        }
 
         // Loop through current set of equations
         for (size_t eqn_idx = 0; eqn_idx < eqs.size(); eqn_idx++) {
@@ -725,7 +730,9 @@ bool ANF::eliminate_linear() {
                 if (eqn_idx != linear_idx) {
                     eliminated_something = true;
                 }
-                cout << " Eliminating for " << eq << endl;
+                if (config.verbosity >= 2) {
+                    cout << " Eliminating for " << eq << endl;
+                }
                 remove_poly_from_occur(eq, eqn_idx);
                 BoolePolynomial new_eq(0, eq.ring());
                 for (const BooleMonomial& mono : eq) {
@@ -737,10 +744,14 @@ bool ANF::eliminate_linear() {
                             new_mono *= BooleVariable(v, eq.ring());
                         }
                     }
-                    cout << "mono: " << mono << " -> " << new_mono << endl;
+                    if (config.verbosity >= 2) {
+                        cout << "mono: " << mono << " -> " << new_mono << endl;
+                    }
                     new_eq += new_mono;
                 }
-                cout << eq << " => " << new_eq << endl;
+                if (config.verbosity >= 2) {
+                    cout << eq << " => " << new_eq << endl;
+                }
                 eq = new_eq;
                 add_poly_to_occur(eq, eqn_idx);
             }
