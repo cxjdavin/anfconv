@@ -329,7 +329,6 @@ void simplify(ANF* anf, const ANF& orig_anf)
         // Apply ANF simplification
         if (doANFSimplify) {
             anf->simplify();
-            anf->propagate();
         }
 
         // Apply Gauss Jordan simplification
@@ -341,7 +340,6 @@ void simplify(ANF* anf, const ANF& orig_anf)
             for(BoolePolynomial poly : newTruths) {
                 anf->addBoolePolynomial(poly);
             }
-            anf->propagate();
         }
 
         // Apply XL simplification (includes Gauss Jordan)
@@ -365,40 +363,27 @@ void simplify(ANF* anf, const ANF& orig_anf)
             for(BoolePolynomial poly : newTruths) {
                 anf->addBoolePolynomial(poly);
             }
-            anf->propagate();
         }
 
         // Apply ElimLin simplification (includes Gauss Jordan)
         if (doELSimplify) {
-            bool fixed_point = false;
-            while (!fixed_point) {
-                cout << *anf << endl;
-                bool eliminated_something = anf->eliminate_linear();
-                cout << *anf << endl;
-                cout << "EL DONE\n";
+            bool eliminated_something = anf->eliminate_linear();
 
-                // Add and print new truths found
-                vector<BoolePolynomial> newTruths;
-                GaussJordan gj(anf->getEqs(), anf->getRing(), config, -1);
-                bool new_gj_truth = gj.run(newTruths);
-                for(BoolePolynomial poly : newTruths) {
-                    anf->addBoolePolynomial(poly);
-                }
-                cout << "GAUSS DONE\n";
-
-                changed |= (eliminated_something || new_gj_truth);
-                fixed_point = (!eliminated_something && !new_gj_truth);
+            // Add and print new truths found
+            vector<BoolePolynomial> newTruths;
+            GaussJordan gj(anf->getEqs(), anf->getRing(), config, -1);
+            bool new_gj_truth = gj.run(newTruths);
+            for(BoolePolynomial poly : newTruths) {
+                anf->addBoolePolynomial(poly);
             }
 
-            anf->propagate();
-            cout << *anf << endl;
+            changed |= (eliminated_something || new_gj_truth);
         }
 
         // Apply SAT simplification (run CMS, then extract learnt clauses)
         if (doSATSimplify) {
             SimplifyBySat simpsat(*anf, orig_anf, config, numConfl);
             changed |= simpsat.simplify();
-            anf->propagate();
         }
 
         uint64_t set_vars = anf->getNumSetVars();
