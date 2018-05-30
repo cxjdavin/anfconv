@@ -36,7 +36,7 @@ class GaussJordan
     public:
         GaussJordan(const vector<BoolePolynomial>& equations,
                     const BoolePolyRing& ring) :
-                equations(equations), ring(ring), nextVar(0) {
+                ring(ring), nextVar(0) {
             // Initialize mapping
             buildMaps(equations);
 
@@ -92,7 +92,6 @@ class GaussJordan
 
     private:
         mzd_t *mat;
-        const vector<BoolePolynomial>& equations;
         const BoolePolyRing& ring;
         uint32_t nextVar;
         std::map<BooleMonomial, uint32_t> monomMap;
