@@ -83,25 +83,11 @@ class GaussJordan
             cout << endl;
         }
 
-        bool run(vector<BoolePolynomial>& newTruths) {
-            assert(newTruths.empty());
+        vector<BoolePolynomial>* run() {
             double startTime = cpuTime();
             vector<BoolePolynomial>* truths = learn();
-            for (const BoolePolynomial& poly : *truths) {
-                bool is_new = true;
-                for (const BoolePolynomial& known : equations) {
-                    if (poly == known) {
-                        is_new = false;
-                        break;
-                    }
-                }
-                if (is_new) {
-                    newTruths.push_back(poly);
-                }
-            }
-            cout << "Gauss Jordan found " << newTruths.size() << " new truth(s)"
-                 << " in " << (cpuTime() - startTime) << " seconds" << endl;
-            return !newTruths.empty();
+            cout << "Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
+            return truths;
         }
 
     private:

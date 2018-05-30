@@ -333,18 +333,28 @@ void simplify(ANF* anf, const ANF& orig_anf)
 
         // Apply Gauss Jordan simplification
         if (doGJSimplify) {
-            // Add and print new truths found
-            vector<BoolePolynomial> newTruths;
+            int num_learnt = 0;
             GaussJordan gj(anf->getEqs(), anf->getRing());
-            changed |= gj.run(newTruths);
-            for(BoolePolynomial poly : newTruths) {
-                anf->addBoolePolynomial(poly);
+            vector<BoolePolynomial>* truths_from_gj = gj.run();
+            for(BoolePolynomial poly : *truths_from_gj) {
+                bool added = anf->addLearntBoolePolynomial(poly);
+                if (added) {
+                    num_learnt++;
+                    if (config.verbosity >= 2) {
+                        cout << "New truth: " << poly << endl;
+                    }
+                }
             }
+            if (config.verbosity >= 1) {
+                cout << "c Gauss Jordan learnt " << num_learnt << " new facts\n";
+            }
+            changed |= (num_learnt != 0);
         }
 
         // Apply XL simplification (includes Gauss Jordan)
         if (doXLSimplify) {
-            // For now, only extend by degree 1 monomials
+            int num_learnt = 0;
+
             vector<BoolePolynomial> equations;
             for (const BoolePolynomial& poly : anf->getEqs()) {
                 equations.push_back(poly);
@@ -356,28 +366,43 @@ void simplify(ANF* anf, const ANF& orig_anf)
                 }
             }
 
-            // Add and print new truths found
-            vector<BoolePolynomial> newTruths;
             GaussJordan gj(equations, anf->getRing());
-            changed |= gj.run(newTruths);
-            for(BoolePolynomial poly : newTruths) {
-                anf->addBoolePolynomial(poly);
+            vector<BoolePolynomial>* truths_from_gj = gj.run();
+            for(BoolePolynomial poly : *truths_from_gj) {
+                bool added = anf->addLearntBoolePolynomial(poly);
+                if (added) {
+                    num_learnt++;
+                    if (config.verbosity >= 2) {
+                        cout << "New truth: " << poly << endl;
+                    }
+                }
             }
+            if (config.verbosity >= 1) {
+                cout << "c XL learnt " << num_learnt << " new facts\n";
+            }
+            changed |= (num_learnt != 0);
         }
 
         // Apply ElimLin simplification (includes Gauss Jordan)
         if (doELSimplify) {
+            int num_learnt = 0;
             bool eliminated_something = anf->eliminate_linear();
-
-            // Add and print new truths found
-            vector<BoolePolynomial> newTruths;
             GaussJordan gj(anf->getEqs(), anf->getRing());
-            bool new_gj_truth = gj.run(newTruths);
-            for(BoolePolynomial poly : newTruths) {
-                anf->addBoolePolynomial(poly);
+            vector<BoolePolynomial>* truths_from_gj = gj.run();
+            for(BoolePolynomial poly : *truths_from_gj) {
+                bool added = anf->addLearntBoolePolynomial(poly);
+                if (added) {
+                    num_learnt++;
+                    if (config.verbosity >= 2) {
+                        cout << "New truth: " << poly << endl;
+                    }
+                }
             }
-
-            changed |= (eliminated_something || new_gj_truth);
+            if (config.verbosity >= 1) {
+                cout << "c EL learnt " << num_learnt << " new facts\n";
+            }
+            changed |= eliminated_something;
+            changed |= (num_learnt != 0);
         }
 
         // Apply SAT simplification (run CMS, then extract learnt clauses)
