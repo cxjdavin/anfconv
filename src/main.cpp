@@ -70,6 +70,7 @@ bool doSATSimplify;
 
 //Parameters
 ConfigData config;
+uint64_t xl_deg;
 uint64_t numConfl;
 vector<string> extractString;
 
@@ -106,12 +107,14 @@ void parseOptions(int argc, char *argv[])
          , "Simplify using GaussJordan")
     ("xlsimp", po::bool_switch(&doXLSimplify)
          , "Simplify using XL (performs GaussJordan internally)")
+    ("xldeg", po::value<uint64_t>(&xl_deg)->default_value(1)
+         , "Expansion degree for XL algorithm. Default = 1 (for now we only support up to xldeg = 3)")
     ("elsimp", po::bool_switch(&doELSimplify)
          , "Simplify using ElimLin (performs GaussJordan internally)")
     ("satsimp", po::bool_switch(&doSATSimplify)
          , "Simplify using SAT")
     ("confl", po::value<uint64_t>(&numConfl)->default_value(20000)
-        , "Conflict limit for built-in SAT solver")
+        , "Conflict limit for built-in SAT solver. Default = 20000")
     ("cutnum", po::value(&config.cutNum)->default_value(config.cutNum)
         , "Cutting number when not using XOR clauses")
     ("extract,e", po::value(&extractString)->multitoken()
@@ -359,11 +362,42 @@ void simplify(ANF* anf, const ANF& orig_anf)
             for (const BoolePolynomial& poly : anf->getEqs()) {
                 equations.push_back(poly);
             }
-            for (unsigned long i = 0; i < anf->getRing().nVariables(); ++i) {
-                BooleVariable v = anf->getRing().variable(i);
-                for (const BoolePolynomial& poly : anf->getEqs()) {
-                    equations.push_back(BoolePolynomial(v * poly));
+
+            // UGLY HACK
+            unsigned long nVars = anf->getRing().nVariables();
+            if (xl_deg >= 1) {
+                for (unsigned long i = 0; i < nVars; ++i) {
+                    BooleVariable v = anf->getRing().variable(i);
+                    for (const BoolePolynomial& poly : anf->getEqs()) {
+                        equations.push_back(BoolePolynomial(v * poly));
+                    }
                 }
+            } else if (xl_deg >= 2) {
+                for (unsigned long i = 0; i < nVars; ++i) {
+                    for (unsigned long j = i+1; j < nVars; ++j) {
+                        BooleVariable v1 = anf->getRing().variable(i);
+                        BooleVariable v2 = anf->getRing().variable(j);
+                        for (const BoolePolynomial& poly : anf->getEqs()) {
+                            equations.push_back(BoolePolynomial(v1 * v2 * poly));
+                        }
+                    }
+                }
+            } else if (xl_deg >= 3) {
+                for (unsigned long i = 0; i < nVars; ++i) {
+                    for (unsigned long j = i+1; j < nVars; ++j) {
+                        for (unsigned long k = j+1; k < nVars; ++k) {
+                            BooleVariable v1 = anf->getRing().variable(i);
+                            BooleVariable v2 = anf->getRing().variable(j);
+                            BooleVariable v3 = anf->getRing().variable(k);
+                            for (const BoolePolynomial& poly : anf->getEqs()) {
+                                equations.push_back(BoolePolynomial(v1 * v2 * v3 * poly));
+                            }
+                        }
+                    }
+                }
+            } else {
+                cout << "We only currently support up to xldeg = 3" << endl;
+                assert(false);
             }
 
             GaussJordan gj(equations, anf->getRing());
