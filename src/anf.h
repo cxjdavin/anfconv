@@ -97,8 +97,9 @@ class ANF
 
         void printStats(int verbosity) const;
 
-        //Set functions
-        void addBoolePolynomial(const BoolePolynomial& poly);
+        // Returns true if polynomial is new and has been added
+        bool addBoolePolynomial(const BoolePolynomial& poly);
+        bool addLearntBoolePolynomial(const BoolePolynomial& poly);
 
         //More advanced state-querying functions
         bool evaluate(const vector<lbool>& vals) const;

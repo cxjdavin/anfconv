@@ -40,23 +40,19 @@ class SimplifyBySat
         bool simplify();
 
     private:
-        void addClausesToSolver();
-        void extractUnitaries();
-        void extractBinXors();
-        void extractXors();
-        void addNewPolynomial(const pair<vector<uint32_t>, bool>& cnf_poly);
-
-        //Main data
         ANF& anf;
         const ANF& orig_anf;
         ConfigData& config;
-
-        //Generated data
+        bool newTruthAdded;
         CNF cnf;
         CMSat::SATSolver* solver;
 
-        //Status&config
-        bool newTruthAdded = false;
+        void addClausesToSolver();
+        bool extractUnitaries();
+        bool extractBinaries();
+        bool extractLinear();
+        bool addPolynomial(const pair<vector<uint32_t>, bool>& cnf_poly);
+        int process(const vector< pair<vector<uint32_t>, bool> >& extracted);
 };
 
 #endif //SIMPLIFYBYSAT_H

@@ -318,6 +318,10 @@ bool ANF::addBoolePolynomial(const BoolePolynomial& poly) {
     return true;
 }
 
+bool ANF::addLearntBoolePolynomial(const BoolePolynomial& poly) {
+    // Contextualize it to existing knowledge
+    BoolePolynomial contextualized_poly = replacer->update(poly);
+    return addBoolePolynomial(contextualized_poly);
 }
 
 void ANF::add_poly_to_occur(const BoolePolynomial& poly, const size_t eq_idx)
@@ -403,12 +407,9 @@ void ANF::propagate() {
                         for (const uint32_t& updated_var : ret) {
                             updatedVars.insert(updated_var);
                         }
-
-                        // Zero out this polynomial
-                        poly = BoolePolynomial(*ring);
                     } else if (poly.length() - (int)poly.hasConstantPart() == 2 && poly.deg() == 1) {
                         // If polynomial is "x + y = 0" or "x + y + 1 = 0", set the value of x in terms of y
-                        BooleMonomial m1 = poly.firstTerm(); // = poly.terms()[0]
+                        BooleMonomial m1 = poly.terms()[0];
                         BooleMonomial m2 = poly.terms()[1];
 
                         assert(m1.deg() == 1);
@@ -425,13 +426,10 @@ void ANF::propagate() {
                         for (const uint32_t& var_idx : ret) {
                             updatedVars.insert(var_idx);
                         }
-
-                        // Zero out this polynomial
-                        poly = BoolePolynomial(*ring);
-                    } else {
-                        // Add back to occur
-                        add_poly_to_occur(poly, eq_idx);
                     }
+
+                    // Add back to occur
+                    add_poly_to_occur(poly, eq_idx);
                 }
             }
         }

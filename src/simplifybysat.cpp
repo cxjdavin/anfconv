@@ -28,18 +28,11 @@ THE SOFTWARE.
 using std::cout;
 using std::endl;
 
-SimplifyBySat::SimplifyBySat(
-    ANF& _anf
-    , const ANF& _orig_anf
-    , ConfigData& _config
-    , uint64_t max_confl
-) :
-    anf(_anf)
-    , orig_anf(_orig_anf)
-    , config(_config)
-    , cnf(anf, _config)
-{
-    //No need to add trivial equations
+SimplifyBySat::SimplifyBySat(ANF& _anf,
+                             const ANF& _orig_anf,
+                             ConfigData& _config,
+                             uint64_t max_confl) :
+        anf(_anf), orig_anf(_orig_anf), config(_config), cnf(anf, _config) {
     cnf.init();
     cnf.addAllEquations();
 
@@ -49,13 +42,11 @@ SimplifyBySat::SimplifyBySat(
     solver->set_max_confl(max_confl);
 }
 
-SimplifyBySat::~SimplifyBySat()
-{
+SimplifyBySat::~SimplifyBySat() {
     delete solver;
 }
 
-void SimplifyBySat::addClausesToSolver()
-{
+void SimplifyBySat::addClausesToSolver() {
     for(const auto it: cnf.getClauses()) {
         for(const Clause& c: it.first) {
             vector<Lit> lits = c.getClause();
@@ -64,110 +55,133 @@ void SimplifyBySat::addClausesToSolver()
     }
 }
 
-void SimplifyBySat::extractUnitaries()
-{
+bool SimplifyBySat::extractUnitaries() {
     vector<Lit> units = solver->get_zero_assigned_lits();
-    if (config.verbosity >= 2)
-        cout << "c Num CNF vars learnt: " << units.size() << endl;
+    if (config.verbosity >= 2) {
+        cout << "c Number of unit learnt clauses: " << units.size() << endl;
+    }
 
     uint64_t numRealVarLearnt = 0;
-    for(size_t i = 0; i < units.size(); i++) {
-        Lit unit = units[i];
-
+    for(const Lit& unit : units) {
         //If var represents a partial XOR clause, skip it
-        if (!cnf.varRepresentsMonomial(unit.var()))
+        if (!cnf.varRepresentsMonomial(unit.var())) {
             continue;
+        }
 
         BooleMonomial m = cnf.getMonomForVar(unit.var());
         assert(m.deg() > 0);
 
-        //Monomial is high degree, and FALSE. That doesn't help much
-        if (m.deg() > 1 && unit.sign() == true)
+        // Monomial is high degree, and FALSE. That doesn't help much
+        if (m.deg() > 1 && unit.sign() == true) {
             continue;
+        }
 
-        //If DEG is 1, then this will set the variable
-        //If DEG is >0 and setting is TRUE, the addBoolePolynomial() will
-        //automatically set all variables in the monomial to ONE
+        // If DEG is 1, then this will set the variable
+        // If DEG is >0 and setting is TRUE, the addBoolePolynomial() will
+        // automatically set all variables in the monomial to ONE
         BoolePolynomial poly(!unit.sign(), anf.getRing());
         poly += m;
-        if (config.verbosity >= 2) {
-            cout << "New truth: " << poly << endl;
+
+        bool added = anf.addLearntBoolePolynomial(poly);
+        if (added) {
+            if (config.verbosity >= 2) {
+                cout << "New truth: " << poly << endl;
+            }
+            numRealVarLearnt++;
         }
-        anf.addBoolePolynomial(poly);
-
-        numRealVarLearnt++;
-    }
-
-    if (config.verbosity >= 1)
-        cout << "c Num ANF vars learnt: " << numRealVarLearnt << endl;
-}
-
-void SimplifyBySat::extractBinXors()
-{
-    vector<pair<Lit, Lit> > binXors = solver->get_all_binary_xors();
-    if (config.verbosity >= 2)
-        cout << "c Num CNF vars replaced:" << binXors.size() << endl;
-
-    uint64_t numRealVarReplaced = 0;
-    for(vector<pair<Lit, Lit> >::const_iterator it = binXors.begin(), end = binXors.end(); it != end; it++) {
-        assert(it->first.var() != it->second.var());
-
-        //If any of the two vars represent a partial XOR clause, skip it
-        if (!cnf.varRepresentsMonomial(it->first.var())
-            || !cnf.varRepresentsMonomial(it->second.var()))
-        {
-            continue;
-        }
-
-        BooleMonomial m1 = cnf.getMonomForVar(it->first.var());
-        assert(m1.deg() > 0);
-        BooleMonomial m2 = cnf.getMonomForVar(it->second.var());
-        assert(m2.deg() > 0);
-
-        if (m1.deg() > 1 || m2.deg() > 1)
-            continue;
-
-        BoolePolynomial poly((it->first.sign() ^ it->second.sign()), anf.getRing());
-        poly += m1;
-        poly += m2;
-        if (config.verbosity >= 2) {
-            cout << "New truth: " << poly << endl;
-        }
-        anf.addBoolePolynomial(poly);
-
-        numRealVarReplaced++;
-    }
-
-    if (config.verbosity >= 1)
-        cout << "c Num ANF vars replaced: " << numRealVarReplaced << endl;
-}
-
-void SimplifyBySat::addNewPolynomial(
-    const pair<vector<uint32_t>, bool>& cnf_poly
-) {
-    BoolePolynomial new_poly(cnf_poly.second, anf.getRing());
-    for (const uint32_t& var_idx : cnf_poly.first) {
-        BooleVariable new_var(var_idx, anf.getRing());
-        new_poly += new_var;
-    }
-    anf.addBoolePolynomial(new_poly);
-}
-
-void SimplifyBySat::extractXors()
-{
-    int num_new_polys;
-    for (const pair<vector<uint32_t>, bool>& cnf_poly : solver->get_recovered_xors(false)) {
-      addNewPolynomial(cnf_poly);
-      num_new_polys++;
-    }
-    for (const pair<vector<uint32_t>, bool>& cnf_poly : solver->get_recovered_xors(true)) {
-      addNewPolynomial(cnf_poly);
-      num_new_polys++;
     }
 
     if (config.verbosity >= 1) {
-        cout << "c CNF yielded " << num_new_polys << " new XOR equations" << endl;
+        cout << "c Num ANF assignments learnt: " << numRealVarLearnt << endl;
     }
+    return (numRealVarLearnt != 0);
+}
+
+bool SimplifyBySat::extractBinaries() {
+    vector<pair<Lit, Lit> > binXors = solver->get_all_binary_xors();
+    if (config.verbosity >= 2) {
+        cout << "c Number of binary clauses:" << binXors.size() << endl;
+    }
+
+    uint64_t numRealVarReplaced = 0;
+    for(pair<Lit, Lit>& pair : binXors) {
+        Lit lit1 = pair.first;
+        Lit lit2 = pair.second;
+        uint32_t v1 = lit1.var();
+        uint32_t v2 = lit2.var();
+        assert(v1 != v2);
+
+        //If any of the two vars represent a partial XOR clause, skip it
+        if (!cnf.varRepresentsMonomial(v1) || !cnf.varRepresentsMonomial(v2)) {
+            continue;
+        }
+
+        BooleMonomial m1 = cnf.getMonomForVar(v1);
+        BooleMonomial m2 = cnf.getMonomForVar(v2);
+
+        // Not anti/equivalence
+        if (m1.deg() > 1 || m2.deg() > 1) {
+            continue;
+        }
+
+        BoolePolynomial poly((lit1.sign() ^ lit2.sign()), anf.getRing());
+        poly += m1;
+        poly += m2;
+
+        bool added = anf.addLearntBoolePolynomial(poly);
+        if (added) {
+            if (config.verbosity >= 2) {
+                cout << "New truth: " << poly << endl;
+            }
+            numRealVarReplaced++;
+        }
+    }
+
+    if (config.verbosity >= 1) {
+        cout << "c Num ANF anti/equivalence learnt: " << numRealVarReplaced << endl;
+    }
+    return (numRealVarReplaced != 0);
+}
+
+bool SimplifyBySat::addPolynomial(const pair<vector<uint32_t>, bool>& cnf_poly) {
+    BoolePolynomial new_poly(cnf_poly.second, anf.getRing());
+    for (const uint32_t& var_idx : cnf_poly.first) {
+        if (!cnf.varRepresentsMonomial(var_idx)) {
+            return false;
+        }
+        new_poly += cnf.getMonomForVar(var_idx);
+    }
+
+    bool added = false;
+    if (new_poly.deg() == 1) {
+        added = anf.addLearntBoolePolynomial(new_poly);
+        if (added && config.verbosity >= 2) {
+            cout << "New truth: " << new_poly << endl;
+        }
+    }
+    return added;
+}
+
+int SimplifyBySat::process(const vector< pair<vector<uint32_t>, bool> >& extracted) {
+    int num_new_polys = 0;
+    for (const pair<vector<uint32_t>, bool>& cnf_poly : extracted) {
+        bool added = addPolynomial(cnf_poly);
+        if (added) {
+            num_new_polys++;
+        }
+    }
+    return num_new_polys;
+}
+
+bool SimplifyBySat::extractLinear() {
+    int num_new_polys = 0;
+    num_new_polys += process(solver->get_recovered_xors(false));
+    num_new_polys += process(solver->get_recovered_xors(true));
+
+    if (config.verbosity >= 1) {
+        cout << "c Num ANF linear equations learnt: " << num_new_polys << endl;
+    }
+    return (num_new_polys != 0);
 }
 
 bool SimplifyBySat::simplify()
@@ -186,15 +200,20 @@ bool SimplifyBySat::simplify()
     addClausesToSolver();
 
     //Solve system of CNF until conflict limit
+    cout << "c Converted CNF has "
+         << cnf.getNumVars() << " variables and "
+         << cnf.getNumClauses() << " clauses" << endl;
     lbool ret = solver->solve();
 
     //Extract data
-    extractUnitaries();
-    extractBinXors();
-    extractXors();
+    newTruthAdded = false;
+    newTruthAdded |= extractUnitaries();
+    newTruthAdded |= extractBinaries();
+    newTruthAdded |= extractLinear();
 
-    if (ret == l_Undef)
+    if (ret == l_Undef) {
         return newTruthAdded;
+    }
 
     if (ret == l_False) {
         cout << "c UNSAT returned by solver" << endl;
