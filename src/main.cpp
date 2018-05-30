@@ -357,7 +357,6 @@ void simplify(ANF* anf, const ANF& orig_anf)
         // Apply XL simplification (includes Gauss Jordan)
         if (doXLSimplify) {
             int num_learnt = 0;
-
             vector<BoolePolynomial> equations;
             for (const BoolePolynomial& poly : anf->getEqs()) {
                 equations.push_back(poly);
@@ -420,8 +419,13 @@ void simplify(ANF* anf, const ANF& orig_anf)
         // Apply ElimLin simplification (includes Gauss Jordan)
         if (doELSimplify) {
             int num_learnt = 0;
-            bool eliminated_something = anf->eliminate_linear();
-            GaussJordan gj(anf->getEqs(), anf->getRing());
+            vector<BoolePolynomial> equations;
+            for (const BoolePolynomial& poly : anf->getEqs()) {
+                equations.push_back(poly);
+            }
+
+            num_learnt += anf->eliminate_linear(equations);
+            GaussJordan gj(equations, anf->getRing());
             vector<BoolePolynomial>* truths_from_gj = gj.run();
             for(BoolePolynomial poly : *truths_from_gj) {
                 bool added = anf->addLearntBoolePolynomial(poly);
@@ -435,7 +439,6 @@ void simplify(ANF* anf, const ANF& orig_anf)
             if (config.verbosity >= 1) {
                 cout << "c EL learnt " << num_learnt << " new facts\n";
             }
-            changed |= eliminated_something;
             changed |= (num_learnt != 0);
         }
 

@@ -65,7 +65,7 @@ class ANF
 
         void propagate();
         void simplify();
-        bool eliminate_linear();
+        int eliminate_linear(vector<BoolePolynomial>& equations);
 
         vector<lbool> extendSolution(const vector<lbool>& solution) const;
 
@@ -81,6 +81,7 @@ class ANF
         bool getOK() const;
         const vector<BoolePolynomial>& getEqs() const;
         size_t getNumSimpleXors() const;
+        size_t getNumSimpleXors(const vector<BoolePolynomial>& equations) const;
         void extractVariables(
             const size_t from
             , const size_t to
@@ -170,13 +171,19 @@ inline const vector<BoolePolynomial>& ANF::getEqs() const
     return eqs;
 }
 
-inline size_t ANF::getNumSimpleXors() const
-{
+inline size_t ANF::getNumSimpleXors() const {
     size_t num = 0;
     for(const BoolePolynomial& poly : eqs) {
         num += (poly.deg() == 1);
     }
+    return num;
+}
 
+inline size_t ANF::getNumSimpleXors(const vector<BoolePolynomial>& equations) const {
+    size_t num = 0;
+    for(const BoolePolynomial& poly : equations) {
+        num += (poly.deg() == 1);
+    }
     return num;
 }
 
