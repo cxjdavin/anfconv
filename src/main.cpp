@@ -335,7 +335,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
         if (doGJSimplify) {
             // Add and print new truths found
             vector<BoolePolynomial> newTruths;
-            GaussJordan gj(anf->getEqs(), anf->getRing(), config, -1);
+            GaussJordan gj(anf->getEqs(), anf->getRing());
             changed |= gj.run(newTruths);
             for(BoolePolynomial poly : newTruths) {
                 anf->addBoolePolynomial(poly);
@@ -358,7 +358,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
 
             // Add and print new truths found
             vector<BoolePolynomial> newTruths;
-            GaussJordan gj(equations, anf->getRing(), config, -1);
+            GaussJordan gj(equations, anf->getRing());
             changed |= gj.run(newTruths);
             for(BoolePolynomial poly : newTruths) {
                 anf->addBoolePolynomial(poly);
@@ -371,7 +371,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
 
             // Add and print new truths found
             vector<BoolePolynomial> newTruths;
-            GaussJordan gj(anf->getEqs(), anf->getRing(), config, -1);
+            GaussJordan gj(anf->getEqs(), anf->getRing());
             bool new_gj_truth = gj.run(newTruths);
             for(BoolePolynomial poly : newTruths) {
                 anf->addBoolePolynomial(poly);
