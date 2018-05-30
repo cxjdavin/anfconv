@@ -293,31 +293,31 @@ size_t ANF::readFile(
     return maxVar;
 }
 
-void ANF::addBoolePolynomial(const BoolePolynomial& poly)
-{
-    //If poly is constant, don't add it
+bool ANF::addBoolePolynomial(const BoolePolynomial& poly) {
+    // Don't add constants
     if (poly.isConstant()) {
+        // Check UNSAT
         if (poly.isOne()) {
             replacer->setNOTOK();
         }
-    } else {
-        // If poly already present, don't add it
-        bool is_new = true;
-        for (const BoolePolynomial& existing : eqs) {
-            if (existing == poly) {
-                is_new = false;
-                break;
-            }
-        }
+        return false;
+    }
 
-        if (is_new) {
-            add_poly_to_occur(poly, eqs.size());
-            eqs.push_back(poly);
-            for (const uint32_t& v : poly.usedVariables()) {
-                updatedVars.insert(v);
-            }
+    // If poly already present, don't add it
+    for (const BoolePolynomial& existing : eqs) {
+        if (existing == poly) {
+            return false;
         }
     }
+
+    add_poly_to_occur(poly, eqs.size());
+    eqs.push_back(poly);
+    for (const uint32_t& v : poly.usedVariables()) {
+        updatedVars.insert(v);
+    }
+    return true;
+}
+
 }
 
 void ANF::add_poly_to_occur(const BoolePolynomial& poly, const size_t eq_idx)
