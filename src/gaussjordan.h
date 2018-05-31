@@ -45,7 +45,7 @@ class GaussJordan
             // number of cols = nextVar + 1
             mat = mzd_init(equations.size(), nextVar + 1);
             assert(mzd_is_zero(mat));
-            cout << "Matrix size: " << mat->nrows << " x " << mat->ncols << endl;
+            cout << "c Matrix size: " << mat->nrows << " x " << mat->ncols << endl;
 
             // Add equations to matrix
             uint32_t row = 0;
@@ -86,7 +86,7 @@ class GaussJordan
         vector<BoolePolynomial>* run() {
             double startTime = cpuTime();
             vector<BoolePolynomial>* truths = learn();
-            cout << "Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
+            cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
             return truths;
         }
 

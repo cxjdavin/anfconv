@@ -336,6 +336,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
 
         // Apply Gauss Jordan simplification
         if (doGJSimplify) {
+            double startTime = cpuTime();
             int num_learnt = 0;
             GaussJordan gj(anf->getEqs(), anf->getRing());
             vector<BoolePolynomial>* truths_from_gj = gj.run();
@@ -344,18 +345,20 @@ void simplify(ANF* anf, const ANF& orig_anf)
                 if (added) {
                     num_learnt++;
                     if (config.verbosity >= 2) {
-                        cout << "New truth: " << poly << endl;
+                        cout << "c New truth: " << poly << endl;
                     }
                 }
             }
             if (config.verbosity >= 1) {
-                cout << "c Gauss Jordan learnt " << num_learnt << " new facts\n";
+                cout << "c Gauss Jordan learnt " << num_learnt << " new facts in "
+                     << (cpuTime() - startTime) << " seconds." << endl;
             }
             changed |= (num_learnt != 0);
         }
 
         // Apply XL simplification (includes Gauss Jordan)
         if (doXLSimplify) {
+            double startTime = cpuTime();
             int num_learnt = 0;
             vector<BoolePolynomial> equations;
             for (const BoolePolynomial& poly : anf->getEqs()) {
@@ -395,7 +398,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
                     }
                 }
             } else {
-                cout << "We only currently support up to xldeg = 3" << endl;
+                cout << "c We only currently support up to xldeg = 3" << endl;
                 assert(false);
             }
 
@@ -406,18 +409,20 @@ void simplify(ANF* anf, const ANF& orig_anf)
                 if (added) {
                     num_learnt++;
                     if (config.verbosity >= 2) {
-                        cout << "New truth: " << poly << endl;
+                        cout << "c New truth: " << poly << endl;
                     }
                 }
             }
             if (config.verbosity >= 1) {
-                cout << "c XL learnt " << num_learnt << " new facts\n";
+                cout << "c XL learnt " << num_learnt << " new facts in "
+                     << (cpuTime() - startTime) << " seconds." << endl;
             }
             changed |= (num_learnt != 0);
         }
 
         // Apply ElimLin simplification (includes Gauss Jordan)
         if (doELSimplify) {
+            double startTime = cpuTime();
             int num_learnt = 0;
             vector<BoolePolynomial> equations;
             for (const BoolePolynomial& poly : anf->getEqs()) {
@@ -432,12 +437,13 @@ void simplify(ANF* anf, const ANF& orig_anf)
                 if (added) {
                     num_learnt++;
                     if (config.verbosity >= 2) {
-                        cout << "New truth: " << poly << endl;
+                        cout << "c New truth: " << poly << endl;
                     }
                 }
             }
             if (config.verbosity >= 1) {
-                cout << "c EL learnt " << num_learnt << " new facts\n";
+                cout << "c EL learnt " << num_learnt << " new facts in "
+                     << (cpuTime() - startTime) << " seconds." << endl;
             }
             changed |= (num_learnt != 0);
         }
@@ -471,7 +477,7 @@ void write_anf(ANF* anf)
     ofs.open(anf_output.c_str());
     if (!ofs) {
         std::cerr
-        << "Error opening file \"" << anf_output << "\" for writing"
+        << "c Error opening file \"" << anf_output << "\" for writing"
         << endl;
         exit(-1);
     }
@@ -510,7 +516,7 @@ void solve_by_sat(const ANF* anf, const ANF& orig_anf)
         std::ofstream ofs;
         ofs.open(cnf_output.c_str());
         if (!ofs) {
-            cout << "Error opening file \""
+            cout << "c Error opening file \""
             << cnf_output
             << "\" for writing" << endl;
             exit(-1);
@@ -560,7 +566,7 @@ void perform_all_operations(const string anf_filename) {
     if (!extractString.empty()) {
         if (!anf->getOK()) {
             //If UNSAT, there is no solution to extract
-            cout << "UNSAT, so no solution to extract" << endl;
+            cout << "c UNSAT, so no solution to extract" << endl;
         } else {
             //Go through each piece of data that needs extraction
             for(const string str: extractString) {
@@ -584,7 +590,7 @@ int main(int argc, char *argv[])
 {
     parseOptions(argc, argv);
     if (anf_input.length() == 0) {
-        cerr << "ERROR: you must provide an ANF input file" << endl;
+        cerr << "c ERROR: you must provide an ANF input file" << endl;
     }
     perform_all_operations(anf_input);
     cout << endl;

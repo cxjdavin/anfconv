@@ -363,7 +363,7 @@ void ANF::propagate() {
         for (const uint32_t& var_idx : updatedVars_snapshot) {
             assert(occur.size() > var_idx);
             if (config.verbosity >= 2) {
-                cout << "Updating variable " << var_idx << endl;
+                cout << "c Updating variable " << var_idx << endl;
             }
             // We will remove and add stuff to occur, so iterate over a snapshot
             const vector<size_t> occur_snapshot = occur[var_idx];
@@ -371,7 +371,7 @@ void ANF::propagate() {
                 assert(eqs.size() > eq_idx);
                 BoolePolynomial& poly = eqs[eq_idx];
                 if (config.verbosity >= 2) {
-                    cout << "  equation: " << poly << endl;
+                    cout << "c equation: " << poly << endl;
                 }
                 remove_poly_from_occur(poly, eq_idx);
                 poly = replacer->update(poly);
@@ -759,7 +759,7 @@ int ANF::eliminate_linear(vector<BoolePolynomial>& equations) {
         bool added = addLearntBoolePolynomial(poly);
         if (added) {
             if (config.verbosity >= 2) {
-                cout << "Adding " << poly << endl;
+                cout << "c Adding " << poly << endl;
             }
             num_learnt++;
         }
