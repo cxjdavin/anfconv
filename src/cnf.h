@@ -85,6 +85,7 @@ class CNF
         size_t getAddedAsSimpleANF() const;
         size_t getAddedAsComplexANF() const;
         const vector<pair<vector<Clause>, BoolePolynomial> >& getClauses() const;
+        const vector<pair<Lit, BoolePolynomial> >& getAssumptions() const;
         uint32_t getNumVars() const;
         void print_stats() const;
 
@@ -117,6 +118,7 @@ class CNF
 
         //The cumulated CNF data
         vector<pair<vector<Clause>, BoolePolynomial> > clauses;
+        vector<pair<Lit, BoolePolynomial> > assumptions;
 
         //uint32_t maps -- internal/external mapping of variables/monomial/polynomials
         std::map<BooleMonomial, uint32_t> monomMap; ///<map: outside monom -> inside var
@@ -181,6 +183,10 @@ inline size_t CNF::getAddedAsComplexANF() const
 inline const vector<pair<vector<Clause>, BoolePolynomial> >& CNF::getClauses() const
 {
     return clauses;
+}
+
+inline const vector<pair<Lit, BoolePolynomial> >& CNF::getAssumptions() const {
+    return assumptions;
 }
 
 inline uint32_t CNF::getNumVars() const

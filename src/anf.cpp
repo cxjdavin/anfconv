@@ -91,15 +91,31 @@ size_t ANF::readFile(
     }
     std::string temp;
 
+    bool is_assumption = false;
     while( std::getline( ifs, temp ) ) {
-        //Empty lines are ignored
-        if (temp.length() == 0)
-            continue;
+        is_assumption = false;
 
-        //Comments are saved then skipped over
-        if ((temp.length() > 0 && temp[0] == 'c')) {
-            comments.push_back(temp);
+        // Empty lines are ignored
+        if (temp.length() == 0) {
             continue;
+        }
+
+        // Save comments
+        if (temp.length() > 0 && temp[0] == 'c') {
+            comments.push_back(temp);
+
+            // Skip comments
+            // But, don't skip if it's an assumption, denoted by "c ASS"
+            if (temp.length() > 4
+                && temp[0] == 'c'
+                && temp[1] == ' '
+                && temp[2] == 'A'
+                && temp[3] == 'S'
+                && temp[4] == 'S') {
+                is_assumption = true;
+            } else {
+                continue;
+            }
         }
 
         BoolePolynomial eq(*ring);
@@ -109,7 +125,7 @@ size_t ANF::readFile(
         bool readInDesc = false;
         size_t var = 0;
         BooleMonomial m(*ring);
-        for (uint32_t i = 0; i < temp.length(); i++) {
+        for (uint32_t i = 0 + 5*is_assumption; i < temp.length(); i++) {
 
             //Handle description separator ','
             if (temp[i] == ',') {
@@ -284,8 +300,13 @@ size_t ANF::readFile(
             exit(-1);
         }
 
-        if (addPoly)
-            addBoolePolynomial(eq);
+        if (addPoly) {
+            if (is_assumption) {
+                assumptions.push_back(eq);
+            } else {
+                addBoolePolynomial(eq);
+            }
+        }
     }
 
     ifs.close();
@@ -327,6 +348,14 @@ bool ANF::addLearntBoolePolynomial(const BoolePolynomial& poly) {
              << "c as: " << contextualized_poly << endl;
     }
     return added;
+}
+
+const vector<BoolePolynomial>* ANF::getContextualizedAssumptions() const {
+    vector<BoolePolynomial>* contextualized_assumptions = new vector<BoolePolynomial>();
+    for (const BoolePolynomial& poly : assumptions) {
+        contextualized_assumptions->push_back(replacer->update(poly));
+    }
+    return contextualized_assumptions;
 }
 
 void ANF::add_poly_to_occur(const BoolePolynomial& poly, const size_t eq_idx)

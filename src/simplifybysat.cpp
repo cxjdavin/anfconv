@@ -47,12 +47,21 @@ SimplifyBySat::~SimplifyBySat() {
 }
 
 void SimplifyBySat::addClausesToSolver() {
-    for(const auto it: cnf.getClauses()) {
-        for(const Clause& c: it.first) {
+    for(const auto it : cnf.getClauses()) {
+        for(const Clause& c : it.first) {
             vector<Lit> lits = c.getClause();
             solver->add_clause(lits);
         }
     }
+}
+
+const vector<Lit>* SimplifyBySat::extract_assumptions() const {
+    vector<Lit>* assumptions = new vector<Lit>();
+    for(const auto it : cnf.getAssumptions()) {
+        Lit assumption_lit = it.first;
+        assumptions->push_back(assumption_lit);
+    }
+    return assumptions;
 }
 
 int SimplifyBySat::extractUnitaries() {

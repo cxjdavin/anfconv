@@ -89,13 +89,25 @@ void CNF::add_trivial_equations()
 
 void CNF::addAllEquations()
 {
-    //Add replaced and set variables to CNF
+    // Add replaced and set variables to CNF
     add_trivial_equations();
 
-    //Add regular equations
+    // Add regular equations
     const vector<BoolePolynomial>& eqs = anf.getEqs();
-    for (vector<BoolePolynomial>::const_iterator it = eqs.begin(), end = eqs.end(); it != end; it++) {
-        addBoolePolynomial(*it);
+    for (const BoolePolynomial& poly : eqs) {
+        addBoolePolynomial(poly);
+    }
+
+    // Add assumptions
+    const vector<BoolePolynomial>* anf_assumptions = anf.getContextualizedAssumptions();
+    for (const BoolePolynomial& poly : *anf_assumptions) {
+        assert(poly.deg() == 1);
+        assert(poly.length() - (int) poly.hasConstantPart() == 1);
+
+        const BooleMonomial& mono = poly.terms()[0];
+        uint32_t v = monomMap.find(mono)->second;
+        Lit assumption_lit(v, !poly.hasConstantPart());
+        assumptions.push_back(make_pair(assumption_lit, poly));
     }
 }
 

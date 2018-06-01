@@ -82,6 +82,7 @@ class ANF
         size_t getNumSetVars() const;
         bool getOK() const;
         const vector<BoolePolynomial>& getEqs() const;
+        const vector<BoolePolynomial>* getContextualizedAssumptions() const;
         size_t getNumSimpleXors() const;
         void extractVariables(
             const size_t from
@@ -127,6 +128,7 @@ class ANF
         vector<string> comments;
 
         //State
+        vector<BoolePolynomial> assumptions;
         vector<BoolePolynomial> eqs;
         Replacer* replacer;
         vector<vector<size_t> > occur; //occur[var] -> index of polys where the variable occurs
