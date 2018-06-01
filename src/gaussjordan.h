@@ -83,11 +83,18 @@ class GaussJordan
             cout << endl;
         }
 
-        vector<BoolePolynomial>* run() {
+        void run(vector<BoolePolynomial>& linear_equations,
+                 vector<BoolePolynomial>& non_linear_equations,
+                 vector<BoolePolynomial>& learnt_equations) {
             double startTime = cpuTime();
-            vector<BoolePolynomial>* truths = learn();
+            extract_from_matrix(&linear_equations, &non_linear_equations, &learnt_equations);
             cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
-            return truths;
+        }
+
+        void run(vector<BoolePolynomial>& learnt_equations) {
+            double startTime = cpuTime();
+            extract_from_matrix(NULL, NULL, &learnt_equations);
+            cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
         }
 
     private:
@@ -114,54 +121,67 @@ class GaussJordan
             }
         }
 
-        vector<BoolePolynomial>* learn() {
-            // Matrix includes augmented column
-            assert(mat->ncols > 0);
+        void extract_from_matrix(vector<BoolePolynomial>* linear_equations,
+                                 vector<BoolePolynomial>* non_linear_equations,
+                                 vector<BoolePolynomial>* learnt_equations) {
+            assert(mat->ncols > 0); // Matrix includes augmented column
+            assert(learnt_equations != NULL);
 
-            // Gauss Jordan
             // See: https://malb.bitbucket.io/m4ri/echelonform_8h.html
             //mzd_echelonize(mat, true);
             mzd_echelonize_m4ri(mat, true, 0);
 
-            vector<BoolePolynomial>* learnt = new vector<BoolePolynomial>();
+            // Process Gauss Jordan output results
             vector<int> ones;
             for (int row = 0; row < mat->nrows; row++) {
+                // Read row
                 ones.clear();
                 for (int col = 0; col < mat->ncols-1; col++) {
                     if (mzd_read_bit(mat, row, col)) {
                         ones.push_back(col);
                     }
                 }
-
                 if (ones.size() == 0) {
                     if (mzd_read_bit(mat, row, mat->ncols-1) == 1) {
                         // Row is "0 = 1", UNSAT
-                        learnt->push_back(BoolePolynomial(true, ring));
-                        return learnt;
+                        learnt_equations->push_back(BoolePolynomial(1, ring));
+                        return;
                     } else {
                         // Row is "0 = 0", skip row
                         continue;
                     }
                 }
 
+                // Form polynomial
                 BoolePolynomial poly(mzd_read_bit(mat, row, mat->ncols-1), ring);
                 for (int col : ones) {
                     poly += revMonomMap.find(col)->second;
                 }
 
+                // Process polynomial
                 if (poly.deg() == 1) {
                     // Linear
-                    learnt->push_back(poly);
-                } else if (ones.size() == 1 && poly.hasConstantPart()) {
+                    if (linear_equations != NULL) {
+                        linear_equations->push_back(poly);
+                    }
+                    learnt_equations->push_back(poly);
+                } else {
+                    // Non-linear
+                    if (non_linear_equations != NULL) {
+                        non_linear_equations->push_back(poly);
+                    }
+
                     // a*b*c*...*z + 1 = 0
-                    learnt->push_back(poly);
-                } else if (ones.size() == 2) {
-                    // Binary
-                    learnt->push_back(poly);
+                    if (ones.size() == 1 && poly.hasConstantPart()) {
+                        learnt_equations->push_back(poly);
+                    }
+
+                    // Binary equation
+                    if (ones.size() == 2) {
+                        learnt_equations->push_back(poly);
+                    }
                 }
             }
-
-            return learnt;
         }
 };
 

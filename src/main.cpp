@@ -341,8 +341,9 @@ void simplify(ANF* anf, const ANF& orig_anf)
             double startTime = cpuTime();
             int num_learnt = 0;
             GaussJordan gj(anf->getEqs(), anf->getRing());
-            vector<BoolePolynomial>* truths_from_gj = gj.run();
-            for(BoolePolynomial poly : *truths_from_gj) {
+            vector<BoolePolynomial> truths_from_gj;
+            gj.run(truths_from_gj);
+            for(BoolePolynomial poly : truths_from_gj) {
                 num_learnt += anf->addLearntBoolePolynomial(poly);
             }
             if (config.verbosity >= 1) {
@@ -361,7 +362,9 @@ void simplify(ANF* anf, const ANF& orig_anf)
                 equations.push_back(poly);
             }
 
-            // UGLY HACK
+            // ugly hack
+            // To do: Use an efficient implementation of "nVars choose xl_deg"
+            //        from http://howardhinnant.github.io/combinations.html?
             unsigned long nVars = anf->getRing().nVariables();
             if (xl_deg >= 1) {
                 for (unsigned long i = 0; i < nVars; ++i) {
@@ -399,8 +402,9 @@ void simplify(ANF* anf, const ANF& orig_anf)
             }
 
             GaussJordan gj(equations, anf->getRing());
-            vector<BoolePolynomial>* truths_from_gj = gj.run();
-            for(BoolePolynomial poly : *truths_from_gj) {
+            vector<BoolePolynomial> truths_from_gj;
+            gj.run(truths_from_gj);
+            for(BoolePolynomial poly : truths_from_gj) {
                 num_learnt += anf->addLearntBoolePolynomial(poly);
             }
             if (config.verbosity >= 1) {
@@ -421,8 +425,9 @@ void simplify(ANF* anf, const ANF& orig_anf)
 
             num_learnt += anf->eliminate_linear(equations);
             GaussJordan gj(equations, anf->getRing());
-            vector<BoolePolynomial>* truths_from_gj = gj.run();
-            for(BoolePolynomial poly : *truths_from_gj) {
+            vector<BoolePolynomial> truths_from_gj;
+            gj.run(truths_from_gj);
+            for(BoolePolynomial poly : truths_from_gj) {
                 num_learnt += anf->addLearntBoolePolynomial(poly);
             }
             if (config.verbosity >= 1) {
