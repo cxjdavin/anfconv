@@ -55,7 +55,7 @@ void SimplifyBySat::addClausesToSolver() {
     }
 }
 
-bool SimplifyBySat::extractUnitaries() {
+int SimplifyBySat::extractUnitaries() {
     vector<Lit> units = solver->get_zero_assigned_lits();
     if (config.verbosity >= 2) {
         cout << "c Number of unit learnt clauses: " << units.size() << endl;
@@ -88,10 +88,10 @@ bool SimplifyBySat::extractUnitaries() {
     if (config.verbosity >= 1) {
         cout << "c Num ANF assignments learnt: " << numRealVarLearnt << endl;
     }
-    return (numRealVarLearnt != 0);
+    return numRealVarLearnt;
 }
 
-bool SimplifyBySat::extractBinaries() {
+int SimplifyBySat::extractBinaries() {
     vector<pair<Lit, Lit> > binXors = solver->get_all_binary_xors();
     if (config.verbosity >= 2) {
         cout << "c Number of binary clauses:" << binXors.size() << endl;
@@ -128,7 +128,7 @@ bool SimplifyBySat::extractBinaries() {
     if (config.verbosity >= 1) {
         cout << "c Num ANF anti/equivalence learnt: " << numRealVarReplaced << endl;
     }
-    return (numRealVarReplaced != 0);
+    return numRealVarReplaced;
 }
 
 bool SimplifyBySat::addPolynomial(const pair<vector<uint32_t>, bool>& cnf_poly) {
@@ -157,7 +157,7 @@ int SimplifyBySat::process(const vector< pair<vector<uint32_t>, bool> >& extract
     return num_new_polys;
 }
 
-bool SimplifyBySat::extractLinear() {
+int SimplifyBySat::extractLinear() {
     int num_new_polys = 0;
     num_new_polys += process(solver->get_recovered_xors(false));
     num_new_polys += process(solver->get_recovered_xors(true));
@@ -165,14 +165,14 @@ bool SimplifyBySat::extractLinear() {
     if (config.verbosity >= 1) {
         cout << "c Num ANF linear equations learnt: " << num_new_polys << endl;
     }
-    return (num_new_polys != 0);
+    return num_new_polys;
 }
 
-bool SimplifyBySat::simplify()
+int SimplifyBySat::simplify()
 {
     if (!anf.getOK()) {
         cout << "Nothing to simplify: UNSAT" << endl;
-        return false;
+        return -1;
     }
 
     //Add variables to SAT solver
@@ -182,28 +182,32 @@ bool SimplifyBySat::simplify()
 
     //Add XOR & normal clauses from CNF
     addClausesToSolver();
+    const vector<Lit>* assumptions = extract_assumptions();
+    // for (auto x : *assumptions) {
+    //     cout << x << endl;
+    // }
 
     //Solve system of CNF until conflict limit
     cout << "c Converted CNF has "
          << cnf.getNumVars() << " variables and "
          << cnf.getNumClauses() << " clauses" << endl;
-    lbool ret = solver->solve();
+    lbool ret = solver->solve(assumptions);
 
     //Extract data
-    newTruthAdded = false;
-    newTruthAdded |= extractUnitaries();
-    newTruthAdded |= extractBinaries();
-    newTruthAdded |= extractLinear();
+    int num_learnt = 0;
+    num_learnt += extractUnitaries();
+    num_learnt += extractBinaries();
+    num_learnt += extractLinear();
 
     if (ret == l_Undef) {
-        return newTruthAdded;
+        return num_learnt;
     }
 
     if (ret == l_False) {
         cout << "c UNSAT returned by solver" << endl;
         anf.addBoolePolynomial(BoolePolynomial(true, anf.getRing()));
 
-        return false;
+        return -1;
     }
 
     //We have a solution
@@ -216,12 +220,14 @@ bool SimplifyBySat::simplify()
             cout << ((solver->get_model()[i] == l_True) ? "" : "-") << i << " ";
         }
     }
-    cout << endl;
+    if (config.verbosity >= 3) {
+        cout << endl;
+    }
 
     vector<lbool> solution2 = cnf.mapSolToOrig(solutionFromSolver);
     const vector<lbool> solution = anf.extendSolution(solution2);
 
-    if (config.verbosity) {
+    if (config.verbosity >= 2) {
         printSolution(solution);
     }
     testSolution(orig_anf, solution);

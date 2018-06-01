@@ -195,8 +195,7 @@ inline size_t ANF::deg() const
     return deg;
 }
 
-inline const vector<BoolePolynomial>& ANF::getEqs() const
-{
+inline const vector<BoolePolynomial>& ANF::getEqs() const {
     return eqs;
 }
 

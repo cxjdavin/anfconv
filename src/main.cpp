@@ -299,6 +299,8 @@ size_t get_ringsize(const string anf_filename)
 
 void simplify(ANF* anf, const ANF& orig_anf)
 {
+    double loopStartTime = cpuTime();
+
     if (doAllSimplify) {
         doANFSimplify = true;
         doGJSimplify = true;
@@ -310,14 +312,16 @@ void simplify(ANF* anf, const ANF& orig_anf)
         cout << "c Begin simplifying of ANF..." << endl
              << "c ANF simp: " << doANFSimplify << endl
              << "c GJ simp: " << doGJSimplify << endl
-             << "c XL simp: " << doXLSimplify << endl
+             << "c XL simp (deg = " << xl_deg << "): " << doXLSimplify << endl
              << "c EL simp: " << doELSimplify << endl
-             << "c SAT simp: " << doSATSimplify << endl;
+             << "c SAT simp (confl limit = " << numConfl << "): " << doSATSimplify << endl;
     }
 
-    bool changed = true;
+    // Perform initial propagation to avoid needing >= 2 iterations
+    anf->propagate();
+
     uint32_t numIters = 0;
-    double myTime = cpuTime();
+    bool changed = true;
     while (changed) {
         changed = false;
 
@@ -327,9 +331,6 @@ void simplify(ANF* anf, const ANF& orig_anf)
         uint64_t prev_deg = anf->deg();
         uint64_t prev_simp_xors = anf->getNumSimpleXors();
         uint64_t prev_replaced_vars = anf->getNumReplacedVars();
-
-        // Basic propagation
-        anf->propagate();
 
         // Apply ANF simplification
         if (doANFSimplify) {
@@ -427,9 +428,18 @@ void simplify(ANF* anf, const ANF& orig_anf)
 
         // Apply SAT simplification (run CMS, then extract learnt clauses)
         if (doSATSimplify) {
+            double startTime = cpuTime();
             SimplifyBySat simpsat(*anf, orig_anf, config, numConfl);
-            changed |= simpsat.simplify();
+            int num_learnt = simpsat.simplify();
+            if (config.verbosity >= 1) {
+                cout << "c Cryptominisat learnt " << num_learnt << " new facts in "
+                     << (cpuTime() - startTime) << " seconds." << endl;
+            }
+            changed |= (num_learnt != 0);
         }
+
+        // Basic propagation
+        anf->propagate();
 
         uint64_t set_vars = anf->getNumSetVars();
         uint64_t eq_num = anf->size();
@@ -445,6 +455,10 @@ void simplify(ANF* anf, const ANF& orig_anf)
                     simp_xors != prev_simp_xors ||
                     replaced_vars != prev_replaced_vars);
         numIters++;
+    }
+    if (config.verbosity >= 1) {
+        cout << "c Tool terminated after " << numIters << " iteration(s) in "
+             << (cpuTime() - loopStartTime) << " seconds." << endl;
     }
 }
 
@@ -520,23 +534,25 @@ void solve_by_sat(const ANF* anf, const ANF& orig_anf)
 }
 
 void perform_all_operations(const string anf_filename) {
+    double parseStartTime = cpuTime();
     const size_t ring_size = get_ringsize(anf_filename);
     BoolePolyRing* ring = new BoolePolyRing(ring_size + 1);
     ANF* anf = new ANF(ring, config);
     anf->readFile(anf_filename, true);
-
     if (config.verbosity >= 1) {
+        cout << "c Input ANF parsed in "
+             << (cpuTime() - parseStartTime) << " seconds." << endl;
         anf->printStats(config.verbosity);
     }
 
-    //Simplification(s), recursively
+    // Perform simplifications
     ANF orig_anf(*anf);
     simplify(anf, orig_anf);
     if (printSimpANF) {
         cout << *anf << endl;
     }
 
-    //Writing simplified ANF
+    // Write simplified ANF
     if (writeANF) {
         write_anf(anf);
     }

@@ -30,6 +30,8 @@ THE SOFTWARE.
 
 #include <map>
 using std::map;
+
+using std::pair;
 using std::make_pair;
 
 class GaussJordan
@@ -51,7 +53,7 @@ class GaussJordan
             // Add equations to matrix
             uint32_t row = 0;
             for (const BoolePolynomial& poly : equations) {
-                for(const BooleMonomial& mono : poly) {
+                for (const BooleMonomial& mono : poly) {
                     // Process non-empty monomials (aka non-constant)
                     if (mono.deg() != 0) {
                         map<BooleMonomial, uint32_t>::const_iterator it = monomMap.find(mono);
@@ -63,6 +65,11 @@ class GaussJordan
                 // Constant goes here
                 mzd_write_bit(mat, row, mat->ncols-1, poly.hasConstantPart());
                 row++;
+
+                // Pre-store existing linear equations
+                if (poly.deg() == 1){
+                    original_linear_equations.push_back(poly);
+                }
             }
         }
 
@@ -84,13 +91,13 @@ class GaussJordan
             cout << endl;
         }
 
-        // For ElimLin only
-        void run(vector<BoolePolynomial>& linear_equations,
-                 vector<BoolePolynomial>& non_linear_equations,
-                 vector<BoolePolynomial>& learnt_equations) {
+        // For ElimLin
+        void run(vector<size_t>& linear_indices,
+                 vector<BoolePolynomial>& all_equations) {
             double startTime = cpuTime();
-            non_linear_equations.clear();
-            extract_from_matrix(&linear_equations, &non_linear_equations, &learnt_equations);
+            linear_indices.clear();
+            all_equations.clear();
+            extract_from_matrix(&linear_indices, &all_equations, NULL);
             cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
         }
 
@@ -103,6 +110,7 @@ class GaussJordan
     private:
         mzd_t *mat;
         const BoolePolyRing& ring;
+        vector<BoolePolynomial> original_linear_equations;
         uint32_t nextVar;
         std::map<BooleMonomial, uint32_t> monomMap;
         std::map<uint32_t, BooleMonomial> revMonomMap;
@@ -124,16 +132,14 @@ class GaussJordan
             }
         }
 
-        void extract_from_matrix(vector<BoolePolynomial>* linear_equations,
-                                 vector<BoolePolynomial>* non_linear_equations,
+        void extract_from_matrix(vector<size_t>* linear_indices,
+                                 vector<BoolePolynomial>* all_equations,
                                  vector<BoolePolynomial>* learnt_equations) {
-            assert(mat->ncols > 0); // Matrix includes augmented column
-            assert(learnt_equations != NULL);
+            assert(learnt_equations != NULL
+                || (linear_indices != NULL && all_equations != NULL));
 
-            // Overwrite non_linear_equations
-            if (non_linear_equations != NULL) {
-                non_linear_equations->clear();
-            }
+            // Matrix includes augmented column
+            assert(mat->ncols > 0);
 
             // See: https://malb.bitbucket.io/m4ri/echelonform_8h.html
             //mzd_echelonize(mat, true);
@@ -152,7 +158,9 @@ class GaussJordan
                 if (ones.size() == 0) {
                     if (mzd_read_bit(mat, row, mat->ncols-1) == 1) {
                         // Row is "0 = 1", UNSAT
-                        learnt_equations->push_back(BoolePolynomial(1, ring));
+                        if (learnt_equations != NULL) {
+                            learnt_equations->push_back(BoolePolynomial(1, ring));
+                        }
                         return;
                     } else {
                         // Row is "0 = 0", skip row
@@ -169,25 +177,37 @@ class GaussJordan
                 // Process polynomial
                 if (poly.deg() == 1) {
                     // Linear
-                    if (linear_equations != NULL) {
-                        linear_equations->push_back(poly);
+                    if (linear_indices != NULL) {
+                        linear_indices->push_back(all_equations->size());
                     }
-                    learnt_equations->push_back(poly);
+
+                    if (learnt_equations != NULL) {
+                        learnt_equations->push_back(poly);
+                    }
                 } else {
                     // Non-linear
-                    if (non_linear_equations != NULL) {
-                        non_linear_equations->push_back(poly);
-                    }
+                    if (learnt_equations != NULL) {
+                        // a*b*c*...*z + 1 = 0
+                        if (ones.size() == 1 && poly.hasConstantPart()) {
+                            learnt_equations->push_back(poly);
+                        }
 
-                    // a*b*c*...*z + 1 = 0
-                    if (ones.size() == 1 && poly.hasConstantPart()) {
-                        learnt_equations->push_back(poly);
+                        // Binary equation
+                        if (ones.size() == 2) {
+                            learnt_equations->push_back(poly);
+                        }
                     }
+                }
+                if (all_equations != NULL) {
+                    all_equations->push_back(poly);
+                }
+            }
 
-                    // Binary equation
-                    if (ones.size() == 2) {
-                        learnt_equations->push_back(poly);
-                    }
+            // Extract cached linear equations
+            if (linear_indices != NULL && all_equations != NULL) {
+                for (BoolePolynomial& poly : original_linear_equations) {
+                    linear_indices->push_back(all_equations->size());
+                    all_equations->push_back(poly);
                 }
             }
         }

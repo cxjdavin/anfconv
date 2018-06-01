@@ -517,6 +517,10 @@ void ANF::simplify() {
 
     // Perform replacement if applicable
     if (replacement_found) {
+        if (config.verbosity >= 1) {
+            cout << "c ANF simp: Replacing " << from_mono
+                 << " with " << to_poly << endl;
+        }
         for (size_t eq_idx = 0; eq_idx < eqs.size(); eq_idx++) {
             BoolePolynomial& poly = eqs[eq_idx];
             remove_poly_from_occur(poly, eq_idx);
@@ -761,19 +765,14 @@ ANF* ANF::minimise(
 
 // Implementation based on https://infoscience.epfl.ch/record/176270/files/ElimLin_full_version.pdf
 int ANF::elimlin() {
-    vector<BoolePolynomial> linear_equations;
-    vector<BoolePolynomial> non_linear_equations;
+    vector<size_t> linear_indices;
+    vector<BoolePolynomial> all_equations;
     vector<BoolePolynomial> learnt_equations;
-    size_t linear_idx = 0;
     int num_learnt = 0;
 
-    // Initialize non_linear with original system
-    // Remember original linear equations
+    // Clone original system
     for (const BoolePolynomial& poly : eqs) {
-        non_linear_equations.push_back(poly);
-        if (poly.deg() == 1) {
-            linear_equations.push_back(poly);
-        }
+        all_equations.push_back(poly);
     }
 
     bool fixedpoint = false;
@@ -781,78 +780,82 @@ int ANF::elimlin() {
         fixedpoint = true;
 
         // Perform Gauss Jordan
-        GaussJordan gj(non_linear_equations, *ring);
-        gj.run(linear_equations, non_linear_equations, learnt_equations);
+        GaussJordan gj(all_equations, *ring);
+        gj.run(linear_indices, all_equations);
+
+        if (config.verbosity >= 1) {
+            cout << "c Processing " << linear_indices.size() << " linear equations\n";
+        }
 
         // Iterate through all linear equations
-        if (config.verbosity >= 1) {
-            cout << "c Processing " << linear_equations.size() - linear_idx
-                  << " linear equations" << endl;
-        }
-        for (; linear_idx < linear_equations.size(); linear_idx++) {
-            // Arbitrarily pick the first variable to substitute
-            const BoolePolynomial& linear_eq = linear_equations[linear_idx];
-            uint32_t var_to_replace = linear_eq.firstTerm().firstVariable().index();
-            BoolePolynomial poly_to_replace = linear_eq + linear_eq.firstTerm().firstVariable();
-            if (config.verbosity >= 2) {
-                cout << "c Replacing " << linear_eq.firstTerm().firstVariable()
-                     << " with " << poly_to_replace << endl;
-            }
+        for (size_t linear_idx : linear_indices) {
+            const BoolePolynomial& linear_eq = all_equations[linear_idx];
+            if (!linear_eq.isConstant()) {
+                fixedpoint = false;
+                learnt_equations.push_back(linear_eq);
 
-            // Run through equation set and replace
-            for (BoolePolynomial& poly : non_linear_equations) {
-                bool has_var = false;
-                for (const uint32_t& v : poly.usedVariables()) {
-                    if (v == var_to_replace) {
-                        has_var = true;
-                        break;
-                    }
+                // Arbitrarily pick the first variable to substitute
+                uint32_t var_to_replace = linear_eq.firstTerm().firstVariable().index();
+                BoolePolynomial poly_to_replace = linear_eq + linear_eq.firstTerm().firstVariable();
+                if (config.verbosity >= 2) {
+                    cout << "c Replacing " << linear_eq.firstTerm().firstVariable()
+                         << " with " << poly_to_replace << endl;
                 }
 
-                // Eliminate variable from this polynomial!
-                if (has_var) {
-                    fixedpoint = false;
-                    BoolePolynomial newpoly(0, *ring);
-                    for (const BooleMonomial& mono : poly) {
-                        BoolePolynomial newmono(1, *ring);
-                        for (const uint32_t& v : mono) {
-                            if (v == var_to_replace) {
-                                newmono *= poly_to_replace;
-                            } else {
-                                newmono *= BooleVariable(v, *ring);
-                            }
+                // Run through all equations and replace
+                for (BoolePolynomial& poly : all_equations) {
+                    bool has_var = false;
+                    for (const uint32_t& v : poly.usedVariables()) {
+                        if (v == var_to_replace) {
+                            has_var = true;
+                            break;
                         }
-                        newpoly += newmono;
-                    }
-                    if (config.verbosity >= 2) {
-                        cout << "c EL: " << poly << " => " << newpoly << endl;
                     }
 
-                    // Add possible useful knowledge back to actual ANF system
-                    // 1) Linear equations (includes assignments and anti/equivalences)
-                    // 2) abc...z + 1 = 0
-                    // 3) mono1 + mono2 = 0/1
-                    size_t realTermsSize = newpoly.length() - (int) newpoly.hasConstantPart();
-                    if (newpoly.deg() == 1
-                    || (realTermsSize == 1 && newpoly.hasConstantPart())
-                    || realTermsSize == 2) {
-                        learnt_equations.push_back(newpoly);
-                    }
+                    // Eliminate variable from this polynomial!
+                    if (has_var) {
+                        BoolePolynomial newpoly(0, *ring);
+                        for (const BooleMonomial& mono : poly) {
+                            BoolePolynomial newmono(1, *ring);
+                            for (const uint32_t& v : mono) {
+                                if (v == var_to_replace) {
+                                    newmono *= poly_to_replace;
+                                } else {
+                                    newmono *= BooleVariable(v, *ring);
+                                }
+                            }
+                            newpoly += newmono;
+                        }
+                        if (config.verbosity >= 2) {
+                            cout << "c EL: " << poly << " => " << newpoly << endl;
+                        }
 
-                    // Overwrite
-                    poly = newpoly;
+                        // Overwrite
+                        poly = newpoly;
+                    }
                 }
             }
         }
     }
 
     // Contextualize final system
-    for (BoolePolynomial& poly : non_linear_equations) {
+    for (BoolePolynomial& poly : all_equations) {
         poly = replacer->update(poly);
+
+        // Add possible useful knowledge back to actual ANF system
+        // 1) Linear equations (includes assignments and anti/equivalences)
+        // 2) abc...z + 1 = 0
+        // 3) mono1 + mono2 = 0/1
+        size_t realTermsSize = poly.length() - (int) poly.hasConstantPart();
+        if (poly.deg() == 1
+        || (realTermsSize == 1 && poly.hasConstantPart())
+        || realTermsSize == 2) {
+            learnt_equations.push_back(poly);
+        }
     }
 
     // If final system has better metric, update system of equations
-    if (numUniqueMonoms(non_linear_equations) < numUniqueMonoms(eqs)) {
+    if (numUniqueMonoms(all_equations) < numUniqueMonoms(eqs)) {
         if (config.verbosity >= 1) {
             cout << "c EL: Overwriting ANF system\n";
         }
@@ -862,15 +865,23 @@ int ANF::elimlin() {
         }
         eqs.clear();
 
-        for (size_t eq_idx = 0; eq_idx < non_linear_equations.size(); eq_idx++) {
-            const BoolePolynomial& poly = non_linear_equations[eq_idx];
+        for (size_t eq_idx = 0; eq_idx < all_equations.size(); eq_idx++) {
+            const BoolePolynomial& poly = all_equations[eq_idx];
             addBoolePolynomial(poly);
         }
     }
 
     // Add learnt_equations
+    int linear_count = 0;
     for (const BoolePolynomial& poly : learnt_equations) {
-        num_learnt += addLearntBoolePolynomial(poly);
+        bool added = addLearntBoolePolynomial(poly);
+        if (added) {
+            num_learnt++;
+            if (poly.deg() == 1) {
+                linear_count++;
+            }
+        }
     }
+    cout << "c EL learnt " << linear_count << " linear equations\n";
     return num_learnt;
 }
