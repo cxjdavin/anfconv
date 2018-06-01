@@ -417,19 +417,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
         // Apply ElimLin simplification (includes Gauss Jordan)
         if (doELSimplify) {
             double startTime = cpuTime();
-            int num_learnt = 0;
-            vector<BoolePolynomial> equations;
-            for (const BoolePolynomial& poly : anf->getEqs()) {
-                equations.push_back(poly);
-            }
-
-            num_learnt += anf->eliminate_linear(equations);
-            GaussJordan gj(equations, anf->getRing());
-            vector<BoolePolynomial> truths_from_gj;
-            gj.run(truths_from_gj);
-            for(BoolePolynomial poly : truths_from_gj) {
-                num_learnt += anf->addLearntBoolePolynomial(poly);
-            }
+            int num_learnt = anf->elimlin();
             if (config.verbosity >= 1) {
                 cout << "c EL learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;

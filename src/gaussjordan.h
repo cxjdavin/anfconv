@@ -30,6 +30,7 @@ THE SOFTWARE.
 
 #include <map>
 using std::map;
+using std::make_pair;
 
 class GaussJordan
 {
@@ -83,10 +84,12 @@ class GaussJordan
             cout << endl;
         }
 
+        // For ElimLin only
         void run(vector<BoolePolynomial>& linear_equations,
                  vector<BoolePolynomial>& non_linear_equations,
                  vector<BoolePolynomial>& learnt_equations) {
             double startTime = cpuTime();
+            non_linear_equations.clear();
             extract_from_matrix(&linear_equations, &non_linear_equations, &learnt_equations);
             cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
         }
@@ -126,6 +129,11 @@ class GaussJordan
                                  vector<BoolePolynomial>* learnt_equations) {
             assert(mat->ncols > 0); // Matrix includes augmented column
             assert(learnt_equations != NULL);
+
+            // Overwrite non_linear_equations
+            if (non_linear_equations != NULL) {
+                non_linear_equations->clear();
+            }
 
             // See: https://malb.bitbucket.io/m4ri/echelonform_8h.html
             //mzd_echelonize(mat, true);

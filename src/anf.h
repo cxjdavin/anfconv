@@ -41,6 +41,7 @@ THE SOFTWARE.
 #include "configdata.h"
 #include "replacer.h"
 #include "evaluator.h"
+#include "gaussjordan.h"
 
 USING_NAMESPACE_PBORI
 
@@ -65,7 +66,7 @@ class ANF
 
         void propagate();
         void simplify();
-        int eliminate_linear(vector<BoolePolynomial>& equations);
+        int elimlin();
 
         vector<lbool> extendSolution(const vector<lbool>& solution) const;
 
@@ -82,7 +83,6 @@ class ANF
         bool getOK() const;
         const vector<BoolePolynomial>& getEqs() const;
         size_t getNumSimpleXors() const;
-        size_t getNumSimpleXors(const vector<BoolePolynomial>& equations) const;
         void extractVariables(
             const size_t from
             , const size_t to
@@ -203,14 +203,6 @@ inline const vector<BoolePolynomial>& ANF::getEqs() const
 inline size_t ANF::getNumSimpleXors() const {
     size_t num = 0;
     for(const BoolePolynomial& poly : eqs) {
-        num += (poly.deg() == 1);
-    }
-    return num;
-}
-
-inline size_t ANF::getNumSimpleXors(const vector<BoolePolynomial>& equations) const {
-    size_t num = 0;
-    for(const BoolePolynomial& poly : equations) {
         num += (poly.deg() == 1);
     }
     return num;
