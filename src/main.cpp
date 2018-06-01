@@ -293,8 +293,7 @@ size_t get_ringsize(const string anf_filename)
     BoolePolyRing* ring = new BoolePolyRing(1);
     ANF* anf = new ANF(ring, config);
     const size_t ring_size = anf->readFile(anf_filename, false);
-    cout << "--> Needed ring size is " << ring_size+1 << endl;
-
+    cout << "c Needed ring size is " << ring_size+1 << endl;
     return ring_size;
 }
 

@@ -346,19 +346,6 @@ void ANF::remove_poly_from_occur(const BoolePolynomial& poly, size_t eq_idx)
     }
 }
 
-//Simplify a single polynomial
-void ANF::simplifyPolynomial(BoolePolynomial& poly, const size_t eq_idx) {
-    //If poly is trivial, skip
-    if (poly.isConstant()) {
-        //Check UNSAT
-        if (poly.isOne()) {
-            replacer->setNOTOK();
-        }
-    } else {
-        // To do
-    }
-}
-
 void ANF::propagate() {
     //Recursively update polynomials, while there is something to update
     while (!updatedVars.empty()) {
@@ -451,17 +438,94 @@ void ANF::propagate() {
     check_simplified_polys_contain_no_set_vars();
 }
 
-void ANF::simplify()
-{
-    for (size_t i = 0; i < ring->nVariables(); i++) {
-        updatedVars.insert(i);
+size_t ANF::evaluateMonoReplacement(const BooleMonomial& from_mono,
+                                    const BoolePolynomial& to_poly) {
+    // Clone system
+    vector<BoolePolynomial> cloned_system;
+    for (const BoolePolynomial& poly : eqs) {
+        cloned_system.push_back(poly);
     }
 
-    while (!updatedVars.empty()) {
-        for (size_t eq_idx = 0 ; eq_idx < eqs.size(); eq_idx++) {
-            simplifyPolynomial(eqs[eq_idx], eq_idx);
+    // Try replace from_mono with to_poly
+    for (BoolePolynomial& poly : cloned_system) {
+        BoolePolynomial newpoly(*ring);
+        for (const BooleMonomial& mono : poly) {
+            if (containsMono(mono, from_mono)) {
+                newpoly += to_poly;
+            } else {
+                newpoly += mono;
+            }
         }
-        propagate();
+        poly = newpoly;
+    }
+
+    // Evaluate metric
+    size_t metric = numUniqueMonoms(cloned_system);
+    return metric;
+}
+
+void ANF::simplify() {
+    // Consider all binary equations of the form: mono1 + mono2 = 0/1
+    // Perform greedy local replacement, similar in spirit to "Bounded variable elimination"
+
+    // Gather binary equations
+    vector<BoolePolynomial> binary_equations;
+    for (const BoolePolynomial& poly : eqs) {
+        if (poly.length() - (int) poly.hasConstantPart() == 2) {
+            binary_equations.push_back(poly);
+        }
+    }
+
+    // For tracking the best replacement (if any beats the current system)
+    bool replacement_found = false;
+    size_t best_metric = numUniqueMonoms(eqs);
+    BooleMonomial from_mono(*ring);
+    BoolePolynomial to_poly(0, *ring);
+
+    // Loop through all possible replacements
+    size_t metric;
+    for (const BoolePolynomial& binary_eq : binary_equations) {
+        // Extract both possible replacements
+        BooleMonomial mono1 = binary_eq.terms()[1];
+        BooleMonomial mono2 = binary_eq.terms()[2];
+        BoolePolynomial poly1 = binary_eq - mono1;
+        BoolePolynomial poly2 = binary_eq - mono2;
+
+        // Try replace mono1 with poly1
+        metric = evaluateMonoReplacement(mono1, poly1);
+        if (metric < best_metric) {
+            replacement_found = true;
+            best_metric = metric;
+            from_mono = mono1;
+            to_poly = poly1;
+        }
+
+        // Try replace mono2 with poly2
+        metric = evaluateMonoReplacement(mono2, poly2);
+        if (metric < best_metric) {
+            replacement_found = true;
+            best_metric = metric;
+            from_mono = mono2;
+            to_poly = poly2;
+        }
+    }
+
+    // Perform replacement if applicable
+    if (replacement_found) {
+        for (size_t eq_idx = 0; eq_idx < eqs.size(); eq_idx++) {
+            BoolePolynomial& poly = eqs[eq_idx];
+            remove_poly_from_occur(poly, eq_idx);
+            BoolePolynomial newpoly(*ring);
+            for (const BooleMonomial& mono : poly) {
+                if (containsMono(mono, from_mono)) {
+                    newpoly += to_poly;
+                } else {
+                    newpoly += mono;
+                }
+            }
+            poly = newpoly;
+            add_poly_to_occur(poly, eq_idx);
+        }
     }
 }
 

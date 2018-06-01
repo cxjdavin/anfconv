@@ -75,6 +75,7 @@ class ANF
         const BoolePolyRing& getRing() const;
         size_t getNumVars() const;
         size_t numMonoms() const;
+        size_t numUniqueMonoms(const vector<BoolePolynomial>& equations) const;
         size_t deg() const;  //Return max. degree of all equations
         size_t getNumReplacedVars() const;
         size_t getNumSetVars() const;
@@ -113,9 +114,10 @@ class ANF
     private:
         void add_poly_to_occur(const BoolePolynomial& poly, size_t eq_idx);
         void remove_poly_from_occur(const BoolePolynomial& poly, size_t eq_idx);
-        void simplifyPolynomial(BoolePolynomial& poly, const size_t eq_idx);
         void removeEmptyEquations();
         void check_simplified_polys_contain_no_set_vars() const;
+        size_t evaluateMonoReplacement(const BooleMonomial& from_mono, const BoolePolynomial& to_poly);
+        bool containsMono(const BooleMonomial& mono1, const BooleMonomial& mono2) const;
 
         //Config
         polybori::BoolePolyRing* ring;
@@ -155,6 +157,33 @@ inline size_t ANF::numMonoms() const
         num += poly.length();
     }
     return num;
+}
+
+inline size_t ANF::numUniqueMonoms(const vector<BoolePolynomial>& equations) const {
+    set<BooleMonomial> unique;
+    for (const BoolePolynomial& poly : equations) {
+        for (const BooleMonomial& mono : poly) {
+            unique.insert(mono);
+        }
+    }
+    return unique.size();
+}
+
+inline bool ANF::containsMono(const BooleMonomial& mono1, const BooleMonomial& mono2) const {
+    // Returns whether mono1 contains mono2
+    for (uint32_t v2 : mono2) {
+        bool has_var = false;
+        for (uint32_t v1 : mono1) {
+            if (v1 == v2) {
+                has_var = true;
+                break;
+            }
+        }
+        if (!has_var) {
+            return false;
+        }
+    }
+    return true;
 }
 
 inline size_t ANF::deg() const
