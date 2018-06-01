@@ -1,2 +1,2 @@
-c RUN: %solver %s | %check %s.out
+c RUN: %solver %s --printsimp | %check %s.out
 x1 + x2

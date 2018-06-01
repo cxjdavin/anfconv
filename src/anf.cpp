@@ -321,7 +321,12 @@ bool ANF::addBoolePolynomial(const BoolePolynomial& poly) {
 bool ANF::addLearntBoolePolynomial(const BoolePolynomial& poly) {
     // Contextualize it to existing knowledge
     BoolePolynomial contextualized_poly = replacer->update(poly);
-    return addBoolePolynomial(contextualized_poly);
+    bool added = addBoolePolynomial(contextualized_poly);
+    if (added && config.verbosity >= 2) {
+        cout << "c Adding: " << poly
+             << "c as: " << contextualized_poly << endl;
+    }
+    return added;
 }
 
 void ANF::add_poly_to_occur(const BoolePolynomial& poly, const size_t eq_idx)
@@ -756,13 +761,7 @@ int ANF::eliminate_linear(vector<BoolePolynomial>& equations) {
 
     int num_learnt = 0;
     for (BoolePolynomial& poly : useful) {
-        bool added = addLearntBoolePolynomial(poly);
-        if (added) {
-            if (config.verbosity >= 2) {
-                cout << "c Adding " << poly << endl;
-            }
-            num_learnt++;
-        }
+        num_learnt += addLearntBoolePolynomial(poly);
     }
     return num_learnt;
 }

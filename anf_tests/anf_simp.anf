@@ -1,2 +1,2 @@
-c RUN: %solver %s --anfsimp | %check %s.out
+c RUN: %solver %s --anfsimp --printsimp | %check %s.out
 x1 + x2

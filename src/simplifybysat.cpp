@@ -82,13 +82,7 @@ bool SimplifyBySat::extractUnitaries() {
         BoolePolynomial poly(!unit.sign(), anf.getRing());
         poly += m;
 
-        bool added = anf.addLearntBoolePolynomial(poly);
-        if (added) {
-            if (config.verbosity >= 2) {
-                cout << "New truth: " << poly << endl;
-            }
-            numRealVarLearnt++;
-        }
+        numRealVarLearnt += anf.addLearntBoolePolynomial(poly);
     }
 
     if (config.verbosity >= 1) {
@@ -128,13 +122,7 @@ bool SimplifyBySat::extractBinaries() {
         poly += m1;
         poly += m2;
 
-        bool added = anf.addLearntBoolePolynomial(poly);
-        if (added) {
-            if (config.verbosity >= 2) {
-                cout << "New truth: " << poly << endl;
-            }
-            numRealVarReplaced++;
-        }
+        numRealVarReplaced += anf.addLearntBoolePolynomial(poly);
     }
 
     if (config.verbosity >= 1) {
@@ -152,14 +140,10 @@ bool SimplifyBySat::addPolynomial(const pair<vector<uint32_t>, bool>& cnf_poly) 
         new_poly += cnf.getMonomForVar(var_idx);
     }
 
-    bool added = false;
     if (new_poly.deg() == 1) {
-        added = anf.addLearntBoolePolynomial(new_poly);
-        if (added && config.verbosity >= 2) {
-            cout << "New truth: " << new_poly << endl;
-        }
+        return anf.addLearntBoolePolynomial(new_poly);
     }
-    return added;
+    return false;
 }
 
 int SimplifyBySat::process(const vector< pair<vector<uint32_t>, bool> >& extracted) {

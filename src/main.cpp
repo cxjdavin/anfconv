@@ -51,6 +51,7 @@ string cnf_output;
 string programName;
 
 //Writing options
+bool printSimpANF;
 bool writeANF;
 bool writeCNF;
 
@@ -97,6 +98,8 @@ void parseOptions(int argc, char *argv[])
         , "SAT solver to use with full path")
     ("verbosity,v", po::value(&config.verbosity)->default_value(1)
         , "Verbosity setting (0 = silent)")
+    ("printsimp", po::bool_switch(&printSimpANF)
+        , "Print simplified ANF. Default = false (for cleaner terminal output)")
     ("dump,d", po::bool_switch(&config.writePNG)
          , "Dump XL's and linearization's matrixes as PNG files")
     ("allsimp", po::bool_switch(&doAllSimplify)
@@ -305,12 +308,12 @@ void simplify(ANF* anf, const ANF& orig_anf)
         doSATSimplify = true;
     }
     if (config.verbosity>=1) {
-        cout << "Simple simplifying of ANF..." << endl
-             << "ANF simp: " << doANFSimplify << endl
-             << "GJ simp: " << doGJSimplify << endl
-             << "XL simp: " << doXLSimplify << endl
-             << "EL simp: " << doELSimplify << endl
-             << "SAT simp: " << doSATSimplify << endl;
+        cout << "c Begin simplifying of ANF..." << endl
+             << "c ANF simp: " << doANFSimplify << endl
+             << "c GJ simp: " << doGJSimplify << endl
+             << "c XL simp: " << doXLSimplify << endl
+             << "c EL simp: " << doELSimplify << endl
+             << "c SAT simp: " << doSATSimplify << endl;
     }
 
     bool changed = true;
@@ -341,13 +344,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
             GaussJordan gj(anf->getEqs(), anf->getRing());
             vector<BoolePolynomial>* truths_from_gj = gj.run();
             for(BoolePolynomial poly : *truths_from_gj) {
-                bool added = anf->addLearntBoolePolynomial(poly);
-                if (added) {
-                    num_learnt++;
-                    if (config.verbosity >= 2) {
-                        cout << "c New truth: " << poly << endl;
-                    }
-                }
+                num_learnt += anf->addLearntBoolePolynomial(poly);
             }
             if (config.verbosity >= 1) {
                 cout << "c Gauss Jordan learnt " << num_learnt << " new facts in "
@@ -405,13 +402,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
             GaussJordan gj(equations, anf->getRing());
             vector<BoolePolynomial>* truths_from_gj = gj.run();
             for(BoolePolynomial poly : *truths_from_gj) {
-                bool added = anf->addLearntBoolePolynomial(poly);
-                if (added) {
-                    num_learnt++;
-                    if (config.verbosity >= 2) {
-                        cout << "c New truth: " << poly << endl;
-                    }
-                }
+                num_learnt += anf->addLearntBoolePolynomial(poly);
             }
             if (config.verbosity >= 1) {
                 cout << "c XL learnt " << num_learnt << " new facts in "
@@ -433,13 +424,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
             GaussJordan gj(equations, anf->getRing());
             vector<BoolePolynomial>* truths_from_gj = gj.run();
             for(BoolePolynomial poly : *truths_from_gj) {
-                bool added = anf->addLearntBoolePolynomial(poly);
-                if (added) {
-                    num_learnt++;
-                    if (config.verbosity >= 2) {
-                        cout << "c New truth: " << poly << endl;
-                    }
-                }
+                num_learnt += anf->addLearntBoolePolynomial(poly);
             }
             if (config.verbosity >= 1) {
                 cout << "c EL learnt " << num_learnt << " new facts in "
@@ -555,7 +540,9 @@ void perform_all_operations(const string anf_filename) {
     //Simplification(s), recursively
     ANF orig_anf(*anf);
     simplify(anf, orig_anf);
-    cout << *anf << endl;
+    if (printSimpANF) {
+        cout << *anf << endl;
+    }
 
     //Writing simplified ANF
     if (writeANF) {
