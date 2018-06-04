@@ -420,6 +420,10 @@ BooleMonomial CNF::getMonomForVar(const uint32_t& var) const
     return it->second;
 }
 
+uint32_t CNF::getVarForMonom(const BooleMonomial& mono) const {
+    return monomMap.find(mono)->second + 1;
+}
+
 void CNF::printMonomMap() const
 {
     for(map<BooleMonomial, uint32_t>::const_iterator it = monomMap.begin(), end = monomMap.end(); it != end; it++) {

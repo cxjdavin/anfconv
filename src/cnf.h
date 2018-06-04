@@ -79,6 +79,7 @@ class CNF
         //GET functions
         bool varRepresentsMonomial(const uint32_t var) const;
         BooleMonomial getMonomForVar(const uint32_t& var) const;
+        uint32_t getVarForMonom(const BooleMonomial& mono) const;
         size_t getNumClauses() const;
         size_t getAddedAsCNF() const;
         size_t getAddedAsANF() const;
@@ -143,7 +144,10 @@ inline std::ostream& operator<<(std::ostream& os, const CNF& cnf)
             os << *it2 << std::endl;
         }
         os << "c " << it->second << std::endl;
-        os << "c ------------" << std::endl;
+        os << "c ------------";
+        if (it+1 != cnf.clauses.end()) {
+            os << std::endl;
+        }
     }
 
     return os;

@@ -512,6 +512,12 @@ void solve_by_sat(const ANF* anf, const ANF& orig_anf)
             << "\" for writing" << endl;
             exit(-1);
         }
+        for(size_t i = 0; i < anf->getRing().nVariables(); i++) {
+            //BooleVariable v(i, anf->getRing());
+            Lit l = anf->getReplaced(i);
+            BooleVariable v(l.var(), anf->getRing());
+            ofs << "c MAP " << i << " = " << cnf.getVarForMonom(v) << endl;
+        }
         ofs << cnf << endl;
         ofs.close();
     }
