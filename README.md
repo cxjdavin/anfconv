@@ -22,17 +22,18 @@ cd polybori-0.8.3
 sudo scons devel-install
 ```
 
-### Cryptominisat (simpsat branch)
+### Cryptominisat
 ```
 git clone https://github.com/msoos/cryptominisat.git
 cd cryptominisat
-git checkout simpsat
 mkdir build
 cd build
 cmake ..
 make -j4
 sudo make install
 ```
+
+Note (For MacOS): If you encounter `cryptominisat.h:30:10: fatal error: 'atomic' file not found` in `#include <atomic>` during compilation, you may need to use `CFLAGS='-stdlib=libc++' make` instead of just `make`.
 
 ### anfconv (This tool!)
 ```
