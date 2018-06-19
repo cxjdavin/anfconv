@@ -883,23 +883,6 @@ int ANF::elimlin() {
         }
     }
 
-    // If final system has better metric, update system of equations
-    if (numUniqueMonoms(all_equations) < numUniqueMonoms(eqs)) {
-        if (config.verbosity >= 1) {
-            cout << "c EL: Overwriting ANF system\n";
-        }
-        for (size_t eq_idx = 0; eq_idx < eqs.size(); eq_idx++) {
-            const BoolePolynomial& poly = eqs[eq_idx];
-            remove_poly_from_occur(poly, eq_idx);
-        }
-        eqs.clear();
-
-        for (size_t eq_idx = 0; eq_idx < all_equations.size(); eq_idx++) {
-            const BoolePolynomial& poly = all_equations[eq_idx];
-            addBoolePolynomial(poly);
-        }
-    }
-
     // Add learnt_equations
     int linear_count = 0;
     for (const BoolePolynomial& poly : learnt_equations) {
