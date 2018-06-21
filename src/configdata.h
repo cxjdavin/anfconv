@@ -32,7 +32,7 @@ struct ConfigData
     bool simplifyWithSAT = false;
     bool writePNG = false;
     bool dumpFullMatrix = false;
-    int useKarn = false;
+    int useKarn = true;
     uint32_t cutNum = 4;
     uint32_t numIters = 10; //Number of iterations for iterativeSolver
 };
