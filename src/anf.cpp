@@ -520,8 +520,8 @@ void ANF::simplify() {
     size_t metric;
     for (const BoolePolynomial& binary_eq : binary_equations) {
         // Extract both possible replacements
-        BooleMonomial mono1 = binary_eq.terms()[1];
-        BooleMonomial mono2 = binary_eq.terms()[2];
+        BooleMonomial mono1 = binary_eq.terms()[0];
+        BooleMonomial mono2 = binary_eq.terms()[1];
         BoolePolynomial poly1 = binary_eq - mono1;
         BoolePolynomial poly2 = binary_eq - mono2;
 
@@ -556,13 +556,18 @@ void ANF::simplify() {
             BoolePolynomial newpoly(*ring);
             for (const BooleMonomial& mono : poly) {
                 if (containsMono(mono, from_mono)) {
-                    newpoly += to_poly;
+                    newpoly += (mono / from_mono) * to_poly;
                 } else {
                     newpoly += mono;
                 }
             }
             poly = newpoly;
             add_poly_to_occur(poly, eq_idx);
+
+            // Check UNSAT
+            if (poly.isConstant() && poly.isOne()) {
+                replacer->setNOTOK();
+            }
         }
     }
 }
