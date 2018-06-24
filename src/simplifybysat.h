@@ -43,7 +43,6 @@ class SimplifyBySat
         ANF& anf;
         const ANF& orig_anf;
         ConfigData& config;
-        bool newTruthAdded;
         CNF cnf;
         CMSat::SATSolver* solver;
 

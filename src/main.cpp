@@ -387,12 +387,11 @@ void simplify(ANF* anf, const ANF& orig_anf)
             }
 
             int multiplier = 0;
-            for (uint32_t d = 0; d < xl_deg; ++d) {
+            for (uint32_t d = 0; d <= xl_deg; ++d) {
                 // Add (n choose d)
                 multiplier += nCr(anf->getRing().nVariables(), d);
             }
-            long long num_cells = anf->size() * multiplier;
-            if (num_cells > 1000000000) {
+            if ((double) anf->size() * multiplier > 1000000000 / anf->getRing().nVariables()) {
                 cout << "c Matrix has over 1 billion cells. Skip XL\n";
             } else {
                 vector<BoolePolynomial> equations;

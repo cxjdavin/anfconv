@@ -241,5 +241,5 @@ int SimplifyBySat::simplify()
     }
     testSolution(orig_anf, solution);
 
-    return newTruthAdded;
+    return num_learnt;
 }

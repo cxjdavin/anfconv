@@ -485,7 +485,7 @@ size_t ANF::evaluateMonoReplacement(const BooleMonomial& from_mono,
         BoolePolynomial newpoly(*ring);
         for (const BooleMonomial& mono : poly) {
             if (containsMono(mono, from_mono)) {
-                newpoly += to_poly;
+                newpoly +=  (mono / from_mono) * to_poly;
             } else {
                 newpoly += mono;
             }
