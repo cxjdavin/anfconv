@@ -71,7 +71,7 @@ bool doSATSimplify;
 
 //Parameters
 ConfigData config;
-uint64_t xl_deg;
+uint32_t xl_deg;
 uint64_t numConfl;
 vector<string> extractString;
 
@@ -110,7 +110,7 @@ void parseOptions(int argc, char *argv[])
          , "Simplify using GaussJordan")
     ("xlsimp", po::bool_switch(&doXLSimplify)
          , "Simplify using XL (performs GaussJordan internally)")
-    ("xldeg", po::value<uint64_t>(&xl_deg)->default_value(1)
+    ("xldeg", po::value<uint32_t>(&xl_deg)->default_value(1)
          , "Expansion degree for XL algorithm. Default = 1 (for now we only support up to xldeg = 3)")
     ("elsimp", po::bool_switch(&doELSimplify)
          , "Simplify using ElimLin (performs GaussJordan internally)")
@@ -297,6 +297,21 @@ size_t get_ringsize(const string anf_filename)
     return ring_size;
 }
 
+// Returns n choose r
+// Note: Assume no overflow
+uint32_t nCr(uint32_t n, uint32_t r) {
+    assert(0 <= r && r <= n);
+    uint32_t b = std::min(r, n-r);
+    uint32_t ans = 1;
+    for (uint32_t i = n; i > n-b; --i) {
+        ans *= i;
+    }
+    for (uint32_t i = 1; i <= b; ++i) {
+        ans /= i;
+    }
+    return ans;
+}
+
 void simplify(ANF* anf, const ANF& orig_anf)
 {
     double loopStartTime = cpuTime();
@@ -341,12 +356,19 @@ void simplify(ANF* anf, const ANF& orig_anf)
         if (doGJSimplify) {
             double startTime = cpuTime();
             int num_learnt = 0;
-            GaussJordan gj(anf->getEqs(), anf->getRing());
-            vector<BoolePolynomial> truths_from_gj;
-            gj.run(truths_from_gj);
-            for(BoolePolynomial poly : truths_from_gj) {
-                num_learnt += anf->addLearntBoolePolynomial(poly);
+
+            long long num_cells = anf->size() * anf->numUniqueMonoms(anf->getEqs());
+            if (num_cells > 1000000000) {
+                cout << "c Matrix has over 1 billion cells. Skip GJE\n";
+            } else {
+                GaussJordan gj(anf->getEqs(), anf->getRing());
+                vector<BoolePolynomial> truths_from_gj;
+                gj.run(truths_from_gj);
+                for(BoolePolynomial poly : truths_from_gj) {
+                    num_learnt += anf->addLearntBoolePolynomial(poly);
+                }
             }
+
             if (config.verbosity >= 1) {
                 cout << "c Gauss Jordan learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
@@ -358,56 +380,71 @@ void simplify(ANF* anf, const ANF& orig_anf)
         if (doXLSimplify) {
             double startTime = cpuTime();
             int num_learnt = 0;
-            vector<BoolePolynomial> equations;
-            for (const BoolePolynomial& poly : anf->getEqs()) {
-                equations.push_back(poly);
+
+            if (xl_deg > 3) {
+               cout << "c We only currently support up to xldeg = 3" << endl;
+               assert(false);
             }
 
-            // ugly hack
-            // To do: Use an efficient implementation of "nVars choose xl_deg"
-            //        from http://howardhinnant.github.io/combinations.html?
-            unsigned long nVars = anf->getRing().nVariables();
-            if (xl_deg >= 1) {
-                for (unsigned long i = 0; i < nVars; ++i) {
-                    BooleVariable v = anf->getRing().variable(i);
-                    for (const BoolePolynomial& poly : anf->getEqs()) {
-                        equations.push_back(BoolePolynomial(v * poly));
-                    }
+            int multiplier = 0;
+            for (uint32_t d = 0; d < xl_deg; ++d) {
+                // Add (n choose d)
+                multiplier += nCr(anf->getRing().nVariables(), d);
+            }
+            long long num_cells = anf->size() * multiplier;
+            if (num_cells > 1000000000) {
+                cout << "c Matrix has over 1 billion cells. Skip XL\n";
+            } else {
+                vector<BoolePolynomial> equations;
+                for (const BoolePolynomial& poly : anf->getEqs()) {
+                    equations.push_back(poly);
                 }
-            } else if (xl_deg >= 2) {
-                for (unsigned long i = 0; i < nVars; ++i) {
-                    for (unsigned long j = i+1; j < nVars; ++j) {
-                        BooleVariable v1 = anf->getRing().variable(i);
-                        BooleVariable v2 = anf->getRing().variable(j);
+
+                // ugly hack
+                // To do: Use an efficient implementation of "nVars choose xl_deg"
+                //        from http://howardhinnant.github.io/combinations.html?
+                unsigned long nVars = anf->getRing().nVariables();
+                if (xl_deg >= 1) {
+                    for (unsigned long i = 0; i < nVars; ++i) {
+                        BooleVariable v = anf->getRing().variable(i);
                         for (const BoolePolynomial& poly : anf->getEqs()) {
-                            equations.push_back(BoolePolynomial(v1 * v2 * poly));
+                            equations.push_back(BoolePolynomial(v * poly));
                         }
                     }
                 }
-            } else if (xl_deg >= 3) {
-                for (unsigned long i = 0; i < nVars; ++i) {
-                    for (unsigned long j = i+1; j < nVars; ++j) {
-                        for (unsigned long k = j+1; k < nVars; ++k) {
+                if (xl_deg >= 2) {
+                    for (unsigned long i = 0; i < nVars; ++i) {
+                        for (unsigned long j = i+1; j < nVars; ++j) {
                             BooleVariable v1 = anf->getRing().variable(i);
                             BooleVariable v2 = anf->getRing().variable(j);
-                            BooleVariable v3 = anf->getRing().variable(k);
                             for (const BoolePolynomial& poly : anf->getEqs()) {
-                                equations.push_back(BoolePolynomial(v1 * v2 * v3 * poly));
+                                equations.push_back(BoolePolynomial(v1 * v2 * poly));
                             }
                         }
                     }
                 }
-            } else {
-                cout << "c We only currently support up to xldeg = 3" << endl;
-                assert(false);
+                if (xl_deg >= 3) {
+                    for (unsigned long i = 0; i < nVars; ++i) {
+                        for (unsigned long j = i+1; j < nVars; ++j) {
+                            for (unsigned long k = j+1; k < nVars; ++k) {
+                                BooleVariable v1 = anf->getRing().variable(i);
+                                BooleVariable v2 = anf->getRing().variable(j);
+                                BooleVariable v3 = anf->getRing().variable(k);
+                                for (const BoolePolynomial& poly : anf->getEqs()) {
+                                    equations.push_back(BoolePolynomial(v1 * v2 * v3 * poly));
+                                }
+                            }
+                        }
+                    }
+                }
+                GaussJordan gj(equations, anf->getRing());
+                vector<BoolePolynomial> truths_from_gj;
+                gj.run(truths_from_gj);
+                for(BoolePolynomial poly : truths_from_gj) {
+                    num_learnt += anf->addLearntBoolePolynomial(poly);
+                }
             }
 
-            GaussJordan gj(equations, anf->getRing());
-            vector<BoolePolynomial> truths_from_gj;
-            gj.run(truths_from_gj);
-            for(BoolePolynomial poly : truths_from_gj) {
-                num_learnt += anf->addLearntBoolePolynomial(poly);
-            }
             if (config.verbosity >= 1) {
                 cout << "c XL learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
