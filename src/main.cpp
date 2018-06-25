@@ -47,6 +47,7 @@ using std::deque;
 
 string anf_input;
 string anf_output;
+string cnf_input;
 string cnf_output;
 string programName;
 
@@ -82,8 +83,10 @@ void parseOptions(int argc, char *argv[])
     generalOptions.add_options()
     ("help,h", "produce help message")
     ("version", "print version number and exit")
-    ("read,r", po::value(&anf_input)
+    ("anfread,r", po::value(&anf_input)
         , "Read ANF from this file")
+    ("cnfread", po::value(&cnf_input)
+        , "Read CNF from this file")
     ("anfwrite,a", po::value(&anf_output)
         , "Write ANF output to file")
     ("cnfwrite,c", po::value(&cnf_output)
@@ -125,11 +128,7 @@ void parseOptions(int argc, char *argv[])
              Must be like '10-20' for extracting x10...x20")
     ("revar", po::value(&renumber_ring_vars)->default_value(0)
         , "Minimise (renumber) ANF before attempting dependency calculation. Reduces ring size")
-
     ;
-
-    po::positional_options_description p;
-    p.add("read", -1);
 
     po::variables_map vm;
     po::options_description cmdline_options;
@@ -141,7 +140,7 @@ void parseOptions(int argc, char *argv[])
         po::store(
             po::command_line_parser(argc, argv)
             .options(cmdline_options)
-            .positional(p).run()
+            .run()
             , vm
         );
 
@@ -195,6 +194,16 @@ void parseOptions(int argc, char *argv[])
         exit(0);
     }
 
+    // Reading methods
+    if (!vm.count("anfread") && !vm.count("cnfread")) {
+        cout << "You must give an ANF/CNF file to read in\n";
+        exit(-1);
+    }
+    if (vm.count("anfread") && vm.count("cnfread")) {
+        cout << "You cannot give both ANF/CNF files to read in\n";
+        exit(-1);
+    }
+
     //Writing methods
     if (vm.count("anfwrite")) {
         writeANF = true;
@@ -203,18 +212,9 @@ void parseOptions(int argc, char *argv[])
         writeCNF = true;
     }
 
-
     if (config.cutNum < 3 || config.cutNum > 10) {
         cout
         << "ERROR! For sanity, cutting number must be between 3 and 10"
-        << endl;
-
-        exit(-1);
-    }
-
-    if (!vm.count("read")) {
-        cout
-        << "You must give an ANF file to read in"
         << endl;
 
         exit(-1);
@@ -567,18 +567,81 @@ void solve_by_sat(const ANF* anf, const ANF& orig_anf)
     }
 }
 
-void perform_all_operations(const string anf_filename) {
+ANF* from_anf(const string anf_filename) {
     double parseStartTime = cpuTime();
     const size_t ring_size = get_ringsize(anf_filename);
     BoolePolyRing* ring = new BoolePolyRing(ring_size + 1);
     ANF* anf = new ANF(ring, config);
     anf->readFile(anf_filename, true);
+
     if (config.verbosity >= 1) {
         cout << "c Input ANF parsed in "
              << (cpuTime() - parseStartTime) << " seconds." << endl;
         anf->printStats(config.verbosity);
     }
+    return anf;
+}
 
+ANF* from_cnf(const string cnf_filename) {
+    double parseStartTime = cpuTime();
+
+    int maxVar = 0;
+    std::ifstream ifs;
+    std::string temp, x;
+
+    ifs.open(cnf_filename.c_str());
+    if (!ifs) {
+        cout << "Problem opening file: " << cnf_filename << " for reading\n";
+        exit(-1);
+    }
+    while(std::getline(ifs, temp)) {
+        if (temp.length() == 0 || temp[0] == 'p' || temp[0] == 'c') {
+            continue;
+        } else {
+            std::istringstream iss(temp);
+            while(iss) {
+                iss >> x;
+                maxVar = std::max(maxVar, abs(stoi(x)));
+            }
+        }
+    }
+
+    // Reset file stream
+    ifs.clear();
+    ifs.seekg(0, ifs.beg);
+
+    BoolePolyRing* ring = new BoolePolyRing(maxVar);
+    ANF* anf = new ANF(ring, config);
+    while(std::getline(ifs, temp)) {
+        if (temp.length() == 0 || temp[0] == 'p' || temp[0] == 'c') {
+            continue;
+        } else {
+            BoolePolynomial poly(1, *ring);
+            std::istringstream iss(temp);
+            while(iss) {
+                iss >> x;
+                int v = stoi(x);
+                if (v == 0) {
+                    break;
+                } else if (v > 0) {
+                    poly *= (BooleConstant(1) + BooleVariable(abs(v)-1, *ring));
+                } else if (v < 0) {
+                    poly *= BooleVariable(abs(v)-1, *ring);
+                }
+            }
+            anf->addBoolePolynomial(poly);
+        }
+    }
+
+    if (config.verbosity >= 1) {
+        cout << "c Input CNF parsed in "
+             << (cpuTime() - parseStartTime) << " seconds." << endl;
+        anf->printStats(config.verbosity);
+    }
+    return anf;
+}
+
+void perform_all_operations(ANF* anf) {
     // Perform simplifications
     ANF orig_anf(*anf);
     simplify(anf, orig_anf);
@@ -618,10 +681,17 @@ void perform_all_operations(const string anf_filename) {
 int main(int argc, char *argv[])
 {
     parseOptions(argc, argv);
-    if (anf_input.length() == 0) {
-        cerr << "c ERROR: you must provide an ANF input file" << endl;
+    if (anf_input.length() == 0 && cnf_input.length() == 0) {
+        cerr << "c ERROR: you must provide an ANF/CNF input file" << endl;
     }
-    perform_all_operations(anf_input);
+
+    ANF* anf;
+    if (anf_input.length() != 0) {
+        anf = from_anf(anf_input);
+    } else {
+        anf = from_cnf(cnf_input);
+    }
+    perform_all_operations(anf);
     cout << endl;
 
     return 0;
