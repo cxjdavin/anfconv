@@ -300,7 +300,7 @@ size_t get_ringsize(const string anf_filename)
 // Returns n choose r
 // Note: Assume no overflow
 uint32_t nCr(uint32_t n, uint32_t r) {
-    assert(0 <= r && r <= n);
+    assert(r <= n);
     uint32_t b = std::min(r, n-r);
     uint32_t ans = 1;
     for (uint32_t i = n; i > n-b; --i) {
