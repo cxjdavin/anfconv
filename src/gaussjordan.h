@@ -116,10 +116,23 @@ class GaussJordan
         std::map<uint32_t, BooleMonomial> revMonomMap;
 
         void buildMaps(const vector<BoolePolynomial> equations) {
+            // Gather all monomials
+            vector<BooleMonomial> all_mono;
             for(const BoolePolynomial& poly : equations) {
                 for(const BooleMonomial& mono : poly) {
-                    addMonom(mono);
+                    all_mono.push_back(mono);
                 }
+            }
+
+            // Sort in ascending degree order
+            std::sort(all_mono.begin(), all_mono.end(),
+                [](const BooleMonomial& lhs, const BooleMonomial& rhs) {
+                    return lhs.deg() < rhs.deg();
+                });
+
+            // Add monomials
+            for (const BooleMonomial& mono : all_mono) {
+                addMonom(mono);
             }
         }
 
