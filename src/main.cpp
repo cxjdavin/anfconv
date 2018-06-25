@@ -340,18 +340,6 @@ void simplify(ANF* anf, const ANF& orig_anf)
     while (changed) {
         changed = false;
 
-        uint64_t prev_set_vars = anf->getNumSetVars();
-        uint64_t prev_eq_num = anf->size();
-        uint64_t prev_monom_in_eq = anf->numMonoms();
-        uint64_t prev_deg = anf->deg();
-        uint64_t prev_simp_xors = anf->getNumSimpleXors();
-        uint64_t prev_replaced_vars = anf->getNumReplacedVars();
-
-        // Apply ANF simplification
-        if (doANFSimplify) {
-            anf->simplify();
-        }
-
         // Apply Gauss Jordan simplification
         if (doGJSimplify) {
             double startTime = cpuTime();
@@ -474,22 +462,26 @@ void simplify(ANF* anf, const ANF& orig_anf)
             changed |= (num_learnt != 0);
         }
 
-        // Basic propagation
-        anf->propagate();
-
-        uint64_t set_vars = anf->getNumSetVars();
-        uint64_t eq_num = anf->size();
-        uint64_t monom_in_eq = anf->numMonoms();
-        uint64_t deg = anf->deg();
-        uint64_t simp_xors = anf->getNumSimpleXors();
-        uint64_t replaced_vars = anf->getNumReplacedVars();
-
-        changed |= (set_vars != prev_set_vars ||
-                    eq_num != prev_eq_num ||
-                    monom_in_eq != prev_monom_in_eq ||
-                    deg != prev_deg ||
-                    simp_xors != prev_simp_xors ||
-                    replaced_vars != prev_replaced_vars);
+        // Apply ANF simplification
+        // Do not update changed if using ANF simplification
+        if (doANFSimplify) {
+            anf->simplify();
+            anf->propagate();
+        } else {
+            uint64_t initial_set_vars = anf->getNumSetVars();
+            uint64_t initial_eq_num = anf->size();
+            uint64_t initial_monom_in_eq = anf->numMonoms();
+            uint64_t initial_deg = anf->deg();
+            uint64_t initial_simp_xors = anf->getNumSimpleXors();
+            uint64_t initial_replaced_vars = anf->getNumReplacedVars();
+            anf->propagate();
+            changed |= (anf->getNumSetVars() != initial_set_vars);
+            changed |= (anf->size() != initial_eq_num);
+            changed |= (anf->numMonoms() != initial_monom_in_eq);
+            changed |= (anf->deg() != initial_deg);
+            changed |= (anf->getNumSimpleXors() != initial_simp_xors);
+            changed |= (anf->getNumReplacedVars() != initial_replaced_vars);
+        }
         numIters++;
     }
     if (config.verbosity >= 1) {

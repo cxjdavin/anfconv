@@ -510,6 +510,11 @@ void ANF::simplify() {
         }
     }
 
+    if (binary_equations.size() * eqs.size() > 1000000000) {
+        cout << "c [ANF simp] skipped as more than 1 billion equations involved.\n";
+        return;
+    }
+
     // For tracking the best replacement (if any beats the current system)
     bool replacement_found = false;
     size_t best_metric = numUniqueMonoms(eqs);
