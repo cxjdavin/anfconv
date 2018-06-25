@@ -547,7 +547,7 @@ void ANF::simplify() {
     // Perform replacement if applicable
     if (replacement_found) {
         if (config.verbosity >= 1) {
-            cout << "c ANF simp: Replacing " << from_mono
+            cout << "c [ANF simp] replace " << from_mono
                  << " with " << to_poly << endl;
         }
         for (size_t eq_idx = 0; eq_idx < eqs.size(); eq_idx++) {

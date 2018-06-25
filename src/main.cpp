@@ -370,7 +370,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
             }
 
             if (config.verbosity >= 1) {
-                cout << "c Gauss Jordan learnt " << num_learnt << " new facts in "
+                cout << "c [Gauss Jordan] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
             }
             changed |= (num_learnt != 0);
@@ -445,7 +445,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
             }
 
             if (config.verbosity >= 1) {
-                cout << "c XL learnt " << num_learnt << " new facts in "
+                cout << "c [XL] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
             }
             changed |= (num_learnt != 0);
@@ -456,7 +456,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
             double startTime = cpuTime();
             int num_learnt = anf->elimlin();
             if (config.verbosity >= 1) {
-                cout << "c EL learnt " << num_learnt << " new facts in "
+                cout << "c [ElimLin] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
             }
             changed |= (num_learnt != 0);
@@ -468,7 +468,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
             SimplifyBySat simpsat(*anf, orig_anf, config, numConfl);
             int num_learnt = simpsat.simplify();
             if (config.verbosity >= 1) {
-                cout << "c Cryptominisat learnt " << num_learnt << " new facts in "
+                cout << "c [Cryptominisat] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
             }
             changed |= (num_learnt != 0);
@@ -493,8 +493,8 @@ void simplify(ANF* anf, const ANF& orig_anf)
         numIters++;
     }
     if (config.verbosity >= 1) {
-        cout << "c Tool terminated after " << numIters << " iteration(s) in "
-             << (cpuTime() - loopStartTime) << " seconds." << endl;
+        cout << "c [Tool terminated after " << numIters << " iteration(s) in "
+             << (cpuTime() - loopStartTime) << " seconds.]" << endl;
     }
 }
 
