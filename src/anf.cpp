@@ -481,6 +481,7 @@ size_t ANF::evaluateMonoReplacement(const BooleMonomial& from_mono,
     }
 
     // Try replace from_mono with to_poly
+    cloned_system.push_back(from_mono + to_poly);
     for (BoolePolynomial& poly : cloned_system) {
         BoolePolynomial newpoly(*ring);
         for (const BooleMonomial& mono : poly) {
@@ -557,6 +558,9 @@ void ANF::simplify() {
         }
         for (size_t eq_idx = 0; eq_idx < eqs.size(); eq_idx++) {
             BoolePolynomial& poly = eqs[eq_idx];
+            if (poly == from_mono + to_poly) {
+                continue;
+            }
             remove_poly_from_occur(poly, eq_idx);
             BoolePolynomial newpoly(*ring);
             for (const BooleMonomial& mono : poly) {

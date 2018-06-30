@@ -337,7 +337,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
 
     uint32_t numIters = 0;
     bool changed = true;
-    while (changed) {
+    while (changed && anf->getOK()) {
         changed = false;
 
         // Apply Gauss Jordan simplification
