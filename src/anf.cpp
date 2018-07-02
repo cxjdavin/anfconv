@@ -821,13 +821,18 @@ int ANF::elimlin() {
     bool fixedpoint = false;
     while (!fixedpoint) {
         fixedpoint = true;
+        if (all_equations.size() * numUniqueMonoms(all_equations) > 1000000000) {
+            cout << "c Matrix has over 1 billion cells. Break out of EL loop\n";
+            break;
+        }
 
         // Perform Gauss Jordan
         GaussJordan gj(all_equations, *ring);
         gj.run(linear_indices, all_equations);
 
         if (config.verbosity >= 1) {
-            cout << "c Processing " << linear_indices.size() << " linear equations\n";
+            cout << "c Processing " << linear_indices.size() << " linear equations"
+                 << "in a system with " << all_equations.size() << " equations\n";
         }
 
         // Iterate through all linear equations
@@ -837,9 +842,21 @@ int ANF::elimlin() {
                 fixedpoint = false;
                 learnt_equations.push_back(linear_eq);
 
-                // Arbitrarily pick the first variable to substitute
-                uint32_t var_to_replace = linear_eq.firstTerm().firstVariable().index();
-                BoolePolynomial poly_to_replace = linear_eq + linear_eq.firstTerm().firstVariable();
+                // Pick variable which best metric to substitute
+                BooleMonomial from_mono(*ring);
+                BoolePolynomial poly_to_replace(0, *ring);
+                size_t best_metric = std::numeric_limits<std::size_t>::max();
+                for (const BooleMonomial& mono : linear_eq) {
+                    const BoolePolynomial poly = linear_eq - mono;
+                    size_t metric = evaluateMonoReplacement(mono, poly);
+                    if (metric < best_metric) {
+                        best_metric = metric;
+                        from_mono = mono;
+                        poly_to_replace = poly;
+                    }
+                }
+                assert(from_mono.deg() == 1);
+                uint32_t var_to_replace = from_mono.firstVariable().index();
                 if (config.verbosity >= 2) {
                     cout << "c Replacing " << linear_eq.firstTerm().firstVariable()
                          << " with " << poly_to_replace << endl;
