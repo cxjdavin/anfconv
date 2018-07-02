@@ -120,14 +120,38 @@ class GaussJordan
             vector<BooleMonomial> all_mono;
             for(const BoolePolynomial& poly : equations) {
                 for(const BooleMonomial& mono : poly) {
-                    all_mono.push_back(mono);
+                    // Ignore constant monomial 1
+                    if (mono.deg() != 0) {
+                      all_mono.push_back(mono);
+                    }
                 }
             }
-
-            // Sort in ascending degree order
+            
+            // Sort in ascending degree-lex order
             std::sort(all_mono.begin(), all_mono.end(),
                 [](const BooleMonomial& lhs, const BooleMonomial& rhs) {
-                    return lhs.deg() < rhs.deg();
+                    if (lhs.deg() == rhs.deg()) {
+                      vector<uint32_t> lhs_v, rhs_v;
+                      for (uint32_t v : lhs) {
+                        lhs_v.push_back(v);
+                      }
+                      for (uint32_t v : rhs) {
+                        rhs_v.push_back(v);
+                      }
+                      assert(lhs_v.size() == rhs_v.size());
+                      std::sort(lhs_v.begin(), lhs_v.end());
+                      std::sort(rhs_v.begin(), rhs_v.end());
+                      for (size_t i = 0; i < lhs_v.size(); i++) {
+                        if (lhs_v[i] == rhs_v[i]) {
+                          continue;
+                        } else {
+                          return lhs_v[i] < rhs_v[i];
+                        }
+                      }
+                      return false;
+                    } else {
+                      return lhs.deg() < rhs.deg();
+                    }
                 });
 
             // Add monomials
