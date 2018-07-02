@@ -465,7 +465,11 @@ void simplify(ANF* anf, const ANF& orig_anf)
         // Apply ANF simplification
         // Do not update changed if using ANF simplification
         if (doANFSimplify) {
-            anf->simplify();
+            cout << "c [Bounded] Number of unique monomials before bounded replacement: "
+                 << anf->numUniqueMonoms(anf->getEqs()) << endl;
+            anf->bounded_replacement();
+            cout << "c [Bounded] Number of unique monomials after  bounded replacement: "
+                 << anf->numUniqueMonoms(anf->getEqs()) << endl;
             anf->propagate();
         } else {
             uint64_t initial_set_vars = anf->getNumSetVars();

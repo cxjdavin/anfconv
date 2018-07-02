@@ -65,7 +65,7 @@ class ANF
         size_t readFile(const std::string& filename, const bool addPoly);
 
         void propagate();
-        void simplify();
+        void bounded_replacement();
         int elimlin();
 
         vector<lbool> extendSolution(const vector<lbool>& solution) const;

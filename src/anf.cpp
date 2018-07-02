@@ -499,7 +499,7 @@ size_t ANF::evaluateMonoReplacement(const BooleMonomial& from_mono,
     return metric;
 }
 
-void ANF::simplify() {
+void ANF::bounded_replacement() {
     // Consider all binary equations of the form: mono1 + mono2 = 0/1
     // Perform greedy local replacement, similar in spirit to "Bounded variable elimination"
 
@@ -694,7 +694,7 @@ void ANF::preferLowVars()
 {
     set<uint32_t> updatedVars2 = replacer->preferLowVars();
     updatedVars.insert(updatedVars2.begin(), updatedVars2.end());
-    simplify();
+    bounded_replacement();
 }
 
 void ANF::extractVariables(
