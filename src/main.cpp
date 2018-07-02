@@ -345,8 +345,7 @@ void simplify(ANF* anf, const ANF& orig_anf)
             double startTime = cpuTime();
             int num_learnt = 0;
 
-            long long num_cells = anf->size() * anf->numUniqueMonoms(anf->getEqs());
-            if (num_cells > 1000000000) {
+            if (anf->size() * anf->numUniqueMonoms(anf->getEqs()) > 1000000000) {
                 cout << "c Matrix has over 1 billion cells. Skip GJE\n";
             } else {
                 GaussJordan gj(anf->getEqs(), anf->getRing());
@@ -379,8 +378,11 @@ void simplify(ANF* anf, const ANF& orig_anf)
                 // Add (n choose d)
                 multiplier += nCr(anf->getRing().nVariables(), d);
             }
-            if ((double) anf->size() * multiplier > 1000000000 / anf->getRing().nVariables()) {
-                cout << "c Matrix has over 1 billion cells. Skip XL\n";
+            if (anf->size() == 0) {
+                cout << "c System is empty. Skip XL\n";
+            } else if ((double) anf->size() * anf->getRing().nVariables() > 1000000000 / multiplier) {
+                cout << "c Matrix has over 1 billion cells. Skip XL\n"
+                     << "c (This is a lower bound estimate assuming no change in numUniqueMonoms)\n";
             } else {
                 vector<BoolePolynomial> equations;
                 for (const BoolePolynomial& poly : anf->getEqs()) {
@@ -424,11 +426,16 @@ void simplify(ANF* anf, const ANF& orig_anf)
                         }
                     }
                 }
-                GaussJordan gj(equations, anf->getRing());
-                vector<BoolePolynomial> truths_from_gj;
-                gj.run(truths_from_gj);
-                for(BoolePolynomial poly : truths_from_gj) {
-                    num_learnt += anf->addLearntBoolePolynomial(poly);
+
+                if ((double) equations.size() > 1000000000 / anf->numUniqueMonoms(equations)) {
+                    cout << "c Matrix has over 1 billion cells. Skip XL\n";
+                } else {
+                    GaussJordan gj(equations, anf->getRing());
+                    vector<BoolePolynomial> truths_from_gj;
+                    gj.run(truths_from_gj);
+                    for(BoolePolynomial poly : truths_from_gj) {
+                        num_learnt += anf->addLearntBoolePolynomial(poly);
+                    }
                 }
             }
 
