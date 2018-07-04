@@ -75,9 +75,15 @@ ConfigData config;
 uint32_t xl_deg;
 uint64_t numConfl;
 vector<string> extractString;
+string executed_args = "";
 
 void parseOptions(int argc, char *argv[])
 {
+    // Store executed arguments to print in output comments
+    for (int i=1 ; i < argc; i++) {
+        executed_args.append(string(argv[i]).append(" "));
+    }
+
     // Declare the supported options.
     po::options_description generalOptions("Allowed options");
     generalOptions.add_options()
@@ -523,6 +529,7 @@ void write_anf(ANF* anf)
     }
 
     //Write to file
+    ofs << "c Executed arguments: " << executed_args << endl;
     ofs << *newanf << endl;
 
     if (renumber_ring_vars) {
@@ -551,6 +558,7 @@ void solve_by_sat(const ANF* anf, const ANF& orig_anf)
             << "\" for writing" << endl;
             exit(-1);
         }
+        ofs << "c Executed arguments: " << executed_args << endl;
         for(size_t i = 0; i < anf->getRing().nVariables(); i++) {
             //BooleVariable v(i, anf->getRing());
             Lit l = anf->getReplaced(i);
