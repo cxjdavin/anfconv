@@ -44,12 +44,36 @@ add_cxx_flag_if_supported("-Wstrict-aliasing")
 add_cxx_flag_if_supported("-Wpointer-arith")
 add_cxx_flag_if_supported("-Wheader-guard")
 
+option(STATICCOMPILE "Compile to static executable" OFF)
+if ((${CMAKE_SYSTEM_NAME} MATCHES "Linux") OR (${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
+    if(STATICCOMPILE)
+        MESSAGE(STATUS "Compiling for static library use")
+        if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+            #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -Wl,--whole-archive -ldl -lpthread -Wl,--no-whole-archive -static ")
+            set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}  -static ")
+        endif()
+
+        SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+
+        # removing -rdynamic that's automatically added
+        foreach (language CXX C)
+            set(VAR_TO_MODIFY "CMAKE_SHARED_LIBRARY_LINK_${language}_FLAGS")
+            string(REGEX REPLACE "(^| )-rdynamic($| )"
+                                 " "
+                                 replacement
+                                 "${${VAR_TO_MODIFY}}")
+            #message("Original (${VAR_TO_MODIFY}) is ${${VAR_TO_MODIFY}} replacement is ${replacement}")
+            set(${VAR_TO_MODIFY} "${replacement}" CACHE STRING "Default flags for ${build_config} configuration" FORCE)
+        endforeach()
+    else()
+        add_definitions(-DBOOST_TEST_DYN_LINK)
+        MESSAGE(STATUS "Compiling for dynamic library use")
+    endif()
+endif()
+
 find_package( Boost 1.34 REQUIRED COMPONENTS program_options)
 link_directories ( ${Boost_LIBRARY_DIRS} )
 include_directories ( ${Boost_INCLUDE_DIRS} )
-
-find_package(PNG REQUIRED)
-include_directories ( ${PNG_INCLUDE_DIRS} )
 
 find_package(ZLIB  REQUIRED)
 link_directories( ${ZLIB_LIBRARY} )

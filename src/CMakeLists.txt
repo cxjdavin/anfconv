@@ -29,6 +29,11 @@ add_executable(anfconv
 )
 set_target_properties(anfconv PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 set_target_properties(anfconv PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+if (STATICCOMPILE)
+    SET_TARGET_PROPERTIES(anfconv PROPERTIES LINK_SEARCH_START_STATIC 1)
+endif()
+
 target_link_libraries(anfconv
     libanfconv
     MV
