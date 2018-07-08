@@ -1,6 +1,6 @@
 /*****************************************************************************
-anfconv
 Copyright (C) 2016  Security Research Labs
+Copyright (C) 2018  Mate Soos, Davin Choo
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9,37 +9,40 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ***********************************************/
 
 #ifndef __GAUSSJORDAN_H__
 #define __GAUSSJORDAN_H__
 
+#include <map>
+
 #include "anf.h"
 #include "m4ri.h"
 #include "time_mem.h"
 
-#include <map>
+using std::cout;
+using std::endl;
 using std::map;
-
 using std::pair;
 using std::make_pair;
+using std::vector;
 
-class GaussJordan
-{
+class GaussJordan {
     public:
         GaussJordan(const vector<BoolePolynomial>& equations,
-                    const BoolePolyRing& ring) :
-                ring(ring), nextVar(0) {
+                    const BoolePolyRing& ring,
+                    uint32_t _verbosity) :
+                nextVar(0), verbosity(_verbosity), ring(ring) {
             // Initialize mapping
             buildMaps(equations);
 
@@ -48,7 +51,9 @@ class GaussJordan
             // number of cols = nextVar + 1
             mat = mzd_init(equations.size(), nextVar + 1);
             assert(mzd_is_zero(mat));
-            cout << "c Matrix size: " << mat->nrows << " x " << mat->ncols << endl;
+            if (verbosity >= 3) {
+                cout << "c Matrix size: " << mat->nrows << " x " << mat->ncols << endl;
+            }
 
             // Add equations to matrix
             uint32_t row = 0;
@@ -98,22 +103,27 @@ class GaussJordan
             linear_indices.clear();
             all_equations.clear();
             extract_from_matrix(&linear_indices, &all_equations, NULL);
-            cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
+            if (verbosity >= 3) {
+                cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
+            }
         }
 
         void run(vector<BoolePolynomial>& learnt_equations) {
             double startTime = cpuTime();
             extract_from_matrix(NULL, NULL, &learnt_equations);
-            cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
+            if (verbosity >= 3) {
+                cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
+            }
         }
 
     private:
+        uint32_t nextVar;
+        uint32_t verbosity;
         mzd_t *mat;
         const BoolePolyRing& ring;
         vector<BoolePolynomial> original_linear_equations;
-        uint32_t nextVar;
-        std::map<BooleMonomial, uint32_t> monomMap;
-        std::map<uint32_t, BooleMonomial> revMonomMap;
+        map<BooleMonomial, uint32_t> monomMap;
+        map<uint32_t, BooleMonomial> revMonomMap;
 
         void buildMaps(const vector<BoolePolynomial> equations) {
             // Gather all monomials
@@ -126,7 +136,7 @@ class GaussJordan
                     }
                 }
             }
-            
+
             // Sort in ascending degree-lex order
             std::sort(all_mono.begin(), all_mono.end(),
                 [](const BooleMonomial& lhs, const BooleMonomial& rhs) {
@@ -179,8 +189,15 @@ class GaussJordan
             assert(mat->ncols > 0);
 
             // See: https://malb.bitbucket.io/m4ri/echelonform_8h.html
-            //mzd_echelonize(mat, true);
+            if (verbosity >= 4) {
+                cout << "c Before Gauss Jordan\n";
+                printMatrix();
+            }
             mzd_echelonize_m4ri(mat, true, 0);
+            if (verbosity >= 4) {
+                cout << "c After Gauss Jordan\n";
+                printMatrix();
+            }
 
             // Process Gauss Jordan output results
             vector<int> ones;

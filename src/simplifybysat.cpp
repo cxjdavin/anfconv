@@ -1,6 +1,6 @@
 /*****************************************************************************
-anfconv
 Copyright (C) 2016  Security Research Labs
+Copyright (C) 2018  Mate Soos, Davin Choo
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9,16 +9,16 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ***********************************************/
 
 #include "simplifybysat.h"
@@ -28,18 +28,15 @@ THE SOFTWARE.
 using std::cout;
 using std::endl;
 
-SimplifyBySat::SimplifyBySat(ANF& _anf,
-                             const ANF& _orig_anf,
-                             ConfigData& _config,
-                             uint64_t max_confl) :
+SimplifyBySat::SimplifyBySat(ANF& _anf, const ANF& _orig_anf, ConfigData& _config) :
         anf(_anf), orig_anf(_orig_anf), config(_config), cnf(anf, _config) {
     cnf.init();
     cnf.addAllEquations();
 
-    //Create SAT solver
+    // Create SAT solver
     solver = new CMSat::SATSolver();
-    solver->set_verbosity(config.verbosity == 1 ? 0 : config.verbosity);
-    solver->set_max_confl(max_confl);
+    solver->set_verbosity(config.verbosity >= 5 ? 1 : 0);
+    solver->set_max_confl(config.numConfl);
 }
 
 SimplifyBySat::~SimplifyBySat() {
@@ -55,18 +52,9 @@ void SimplifyBySat::addClausesToSolver() {
     }
 }
 
-const vector<Lit>* SimplifyBySat::extract_assumptions() const {
-    vector<Lit>* assumptions = new vector<Lit>();
-    for(const auto it : cnf.getAssumptions()) {
-        Lit assumption_lit = it.first;
-        assumptions->push_back(assumption_lit);
-    }
-    return assumptions;
-}
-
 int SimplifyBySat::extractUnitaries() {
     vector<Lit> units = solver->get_zero_assigned_lits();
-    if (config.verbosity >= 2) {
+    if (config.verbosity >= 3) {
         cout << "c Number of unit learnt clauses: " << units.size() << endl;
     }
 
@@ -94,7 +82,7 @@ int SimplifyBySat::extractUnitaries() {
         numRealVarLearnt += anf.addLearntBoolePolynomial(poly);
     }
 
-    if (config.verbosity >= 1) {
+    if (config.verbosity >= 3) {
         cout << "c Num ANF assignments learnt: " << numRealVarLearnt << endl;
     }
     return numRealVarLearnt;
@@ -102,7 +90,7 @@ int SimplifyBySat::extractUnitaries() {
 
 int SimplifyBySat::extractBinaries() {
     vector<pair<Lit, Lit> > binXors = solver->get_all_binary_xors();
-    if (config.verbosity >= 2) {
+    if (config.verbosity >= 3) {
         cout << "c Number of binary clauses:" << binXors.size() << endl;
     }
 
@@ -134,7 +122,7 @@ int SimplifyBySat::extractBinaries() {
         numRealVarReplaced += anf.addLearntBoolePolynomial(poly);
     }
 
-    if (config.verbosity >= 1) {
+    if (config.verbosity >= 3) {
         cout << "c Num ANF anti/equivalence learnt: " << numRealVarReplaced << endl;
     }
     return numRealVarReplaced;
@@ -171,36 +159,33 @@ int SimplifyBySat::extractLinear() {
     num_new_polys += process(solver->get_recovered_xors(false));
     num_new_polys += process(solver->get_recovered_xors(true));
 
-    if (config.verbosity >= 1) {
+    if (config.verbosity >= 3) {
         cout << "c Num ANF linear equations learnt: " << num_new_polys << endl;
     }
     return num_new_polys;
 }
 
-int SimplifyBySat::simplify()
-{
+int SimplifyBySat::simplify() {
     if (!anf.getOK()) {
-        cout << "Nothing to simplify: UNSAT" << endl;
+        cout << "c Nothing to simplify: UNSAT" << endl;
         return -1;
     }
 
-    //Add variables to SAT solver
+    // Add variables to SAT solver
     for(uint32_t i = 0; i < cnf.getNumVars(); i++) {
         solver->new_var();
     }
 
-    //Add XOR & normal clauses from CNF
+    // Add XOR & normal clauses from CNF
     addClausesToSolver();
-    const vector<Lit>* assumptions = extract_assumptions();
-    // for (auto x : *assumptions) {
-    //     cout << x << endl;
-    // }
 
-    //Solve system of CNF until conflict limit
-    cout << "c Converted CNF has "
-         << cnf.getNumVars() << " variables and "
-         << cnf.getNumClauses() << " clauses" << endl;
-    lbool ret = solver->solve(assumptions);
+    // Solve system of CNF until conflict limit
+    if (config.verbosity >= 3) {
+        cout << "c Converted CNF has "
+             << cnf.getNumVars() << " variables and "
+             << cnf.getNumClauses() << " clauses" << endl;
+    }
+    lbool ret = solver->solve();
 
     //Extract data
     int num_learnt = 0;
@@ -215,7 +200,6 @@ int SimplifyBySat::simplify()
     if (ret == l_False) {
         cout << "c UNSAT returned by solver" << endl;
         anf.addBoolePolynomial(BoolePolynomial(true, anf.getRing()));
-
         return -1;
     }
 
@@ -225,18 +209,12 @@ int SimplifyBySat::simplify()
     for(uint32_t i = 0; i < solver->get_model().size(); i++) {
         solutionFromSolver[i] = solver->get_model()[i];
         assert(solver->get_model()[i] != l_Undef);
-        if (config.verbosity >= 3) {
-            cout << ((solver->get_model()[i] == l_True) ? "" : "-") << i << " ";
-        }
-    }
-    if (config.verbosity >= 3) {
-        cout << endl;
     }
 
     vector<lbool> solution2 = cnf.mapSolToOrig(solutionFromSolver);
     const vector<lbool> solution = anf.extendSolution(solution2);
 
-    if (config.verbosity >= 2) {
+    if (config.verbosity >= 5) {
         printSolution(solution);
     }
     testSolution(orig_anf, solution);

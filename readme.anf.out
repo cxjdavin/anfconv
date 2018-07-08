@@ -1,0 +1,11 @@
+c Executed arguments: --anfread readme.anf --anfwrite readme.anf.out --custom --elsimp 
+c -------------
+c Fixed values
+c -------------
+x(2) + 1
+c -------------
+c Equivalences
+c -------------
+x(3) + x(1) + 1
+c UNSAT : false
+

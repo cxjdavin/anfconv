@@ -1,3 +1,0 @@
-c RUN: %solver --anfread %s --elsimp --printsimp | %check %s.out
-x1 + x2 + x3
-x1*x2 + x2*x3 + 1

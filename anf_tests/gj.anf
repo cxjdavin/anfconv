@@ -1,3 +1,0 @@
-c RUN: %solver --anfread %s --gjsimp --printsimp | %check %s.out
-x1*x2 + x1 + x2
-x1*x2 + x1 + x3

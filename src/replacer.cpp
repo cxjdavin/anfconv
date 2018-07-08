@@ -1,6 +1,6 @@
 /*****************************************************************************
-anfconv
 Copyright (C) 2016  Security Research Labs
+Copyright (C) 2018  Mate Soos, Davin Choo
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9,16 +9,16 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ***********************************************/
 
 #include "replacer.h"
@@ -31,8 +31,7 @@ using CMSat::lbool;
 using std::cout;
 using std::endl;
 
-bool Replacer::evaluate(const vector<lbool>& vals) const
-{
+bool Replacer::evaluate(const vector<lbool>& vals) const {
     bool ret = true;
     size_t num = 0;
     for(vector<lbool>::const_iterator
@@ -79,22 +78,17 @@ bool Replacer::evaluate(const vector<lbool>& vals) const
  *              = (1+d)*(e)*(1+f)
  *              = a*b*c
  */
-BoolePolynomial Replacer::update(const BooleMonomial& m) const
-{
+BoolePolynomial Replacer::update(const BooleMonomial& m) const {
     BoolePolynomial ret(true, m.ring());
 
-    for(BooleMonomial::const_iterator
-        it = m.begin(), end = m.end()
-        ; it != end
-        ; it++
-    ) {
-        if (value[*it] != l_Undef) {
-            if (value[*it] == l_True) continue;
+    for(const uint32_t v : m) {
+        if (value[v] != l_Undef) {
+            if (value[v] == l_True) continue;
             else return BoolePolynomial(m.ring());
         }
 
-        assert(replaceTable.size() > *it); //Variable must exist
-        const Lit lit = replaceTable[*it];
+        assert(replaceTable.size() > v); //Variable must exist
+        const Lit lit = replaceTable[v];
 
         BoolePolynomial alsoAdd(m.ring());
         if (lit.sign()) alsoAdd = ret;
@@ -105,26 +99,15 @@ BoolePolynomial Replacer::update(const BooleMonomial& m) const
     return ret;
 }
 
-BoolePolynomial Replacer::update(const BoolePolynomial& eq) const
-{
-    //std::cout << "Updating eq: " << eq << std::endl;
+BoolePolynomial Replacer::update(const BoolePolynomial& eq) const {
     BoolePolynomial ret = BoolePolynomial(eq.ring());
-
-    for(BoolePolynomial::const_iterator
-        it = eq.begin(), end = eq.end()
-        ; it != end
-        ; it++
-    ) {
-        ret += update(*it);
+    for(const BooleMonomial& mono : eq) {
+        ret += update(mono);
     }
-
-    //std::cout << "Updated eq: " << ret << std::endl;
-
     return ret;
 }
 
-vector<uint32_t> Replacer::setValue(uint32_t var, bool val)
-{
+vector<uint32_t> Replacer::setValue(uint32_t var, bool val) {
     vector<uint32_t> alsoUpdated;
     alsoUpdated.push_back(var);
 
@@ -165,8 +148,7 @@ vector<uint32_t> Replacer::setValue(uint32_t var, bool val)
     return alsoUpdated;
 }
 
-vector<uint32_t> Replacer::setReplace(uint32_t var, Lit lit)
-{
+vector<uint32_t> Replacer::setReplace(uint32_t var, Lit lit) {
     assert(var < replaceTable.size());
     assert(lit.var() < replaceTable.size());
 
@@ -258,80 +240,7 @@ vector<uint32_t> Replacer::setReplace(uint32_t var, Lit lit)
     return ret;
 }
 
-set<uint32_t> Replacer::preferLowVars()
-{
-    set<uint32_t> updatedVars;
-    for(size_t i = 0; i < replaceTable.size(); i++) {
-        //Is it OK?
-        if (replaceTable[i].var() <= i)
-            continue;
-
-        //NOW: i < replaceTable[i].var()
-
-        //Wrong var
-        Lit badLit = replaceTable[i];
-
-        //This variable must exist in the revReplaceTable
-        map<uint32_t, vector<uint32_t> >::iterator findIt = revReplaceTable.find(badLit.var());
-        assert(findIt != revReplaceTable.end());
-
-        //Replace where it points to
-        //This actually replaces the variable i with itself
-        const vector<uint32_t> toChange = revReplaceTable[badLit.var()];
-        for(vector<uint32_t>::const_iterator
-            it = toChange.begin(), end = toChange.end()
-            ; it != end
-            ; it++
-        ) {
-            Lit old = replaceTable[*it];
-            replaceTable[*it] = Lit(i, badLit.sign()) ^ old.sign();
-        }
-        assert(replaceTable[i] == Lit(i, false));
-
-        //Replace last one
-        replaceTable[badLit.var()] = Lit(i, badLit.sign());
-
-        //Remove original revReplaceTable
-        revReplaceTable.erase(findIt);
-
-        //New one must not have a revReplaceTable
-        findIt = revReplaceTable.find(i);
-        assert(findIt == revReplaceTable.end());
-
-        //Fill new revReplaceTable
-        vector<uint32_t> rev;
-        for(vector<uint32_t>::const_iterator
-            it = toChange.begin(), end = toChange.end()
-            ; it != end
-            ; it++
-        ) {
-            updatedVars.insert(*it);
-
-            //This is where we will insert it to
-            if (*it == i) {
-                continue;
-            }
-
-            rev.push_back(*it);
-        }
-        //Handle the last one
-        rev.push_back(badLit.var());
-        updatedVars.insert(badLit.var());
-
-        //Insert the revReplaceTable
-        revReplaceTable.insert(std::make_pair(i, rev));
-
-        cout
-        << "Fixed var : " << badLit.var()+1
-        << " for " << i+1 << " , "
-        << endl;
-    }
-
-    return updatedVars;
-}
-
-vector<lbool> Replacer::extendSolution(const vector<lbool>& solution) const
-{
+vector<lbool> Replacer::extendSolution(const vector<lbool>& solution) const {
     assert(solution.size() <= value.size());
     vector<lbool> sol2(solution);
     sol2.resize(value.size(), l_Undef);
@@ -348,17 +257,15 @@ vector<lbool> Replacer::extendSolution(const vector<lbool>& solution) const
             && *it != l_Undef
         ) {
             if (sol2[num] != *it) {
-                cout
-                << "Solved solution and solution stored by replacer differ!"
-                << endl;
-
+                cout << "Solved solution and solution stored by replacer differ!\n";
                 exit(-1);
             }
             continue;
         }
 
-        if (*it != l_Undef)
+        if (*it != l_Undef) {
             sol2[num] = *it;
+        }
     }
 
     //Add replaced variables
@@ -391,55 +298,44 @@ vector<lbool> Replacer::extendSolution(const vector<lbool>& solution) const
     return sol2;
 }
 
-vector<lbool> ANF::extendSolution(const vector<lbool>& solution) const
-{
+vector<lbool> ANF::extendSolution(const vector<lbool>& solution) const {
     return replacer->extendSolution(solution);
 }
 
-size_t ANF::getNumVars() const
-{
+size_t ANF::getNumVars() const {
     return replacer->getNumVars();
 }
 
-size_t ANF::getNumReplacedVars() const
-{
+size_t ANF::getNumReplacedVars() const {
     return replacer->getNumReplacedVars();
 }
 
-size_t ANF::getNumSetVars() const
-{
+size_t ANF::getNumSetVars() const {
     return replacer->getNumSetVars();
 }
 
-bool ANF::getOK() const
-{
+bool ANF::getOK() const {
     return replacer->getOK();
 }
 
-lbool ANF::value(const uint32_t var) const
-{
+lbool ANF::value(const uint32_t var) const {
     return replacer->getValue(var);
 }
 
-Lit ANF::getReplaced(const uint32_t var) const
-{
+Lit ANF::getReplaced(const uint32_t var) const {
     return replacer->getReplaced(var);
 }
 
-bool Replacer::isReplaced(const uint32_t var) const
-{
+bool Replacer::isReplaced(const uint32_t var) const {
     return getReplaced(var).var() != var;
 }
 
-const vector<lbool>& ANF::getFixedValues() const
-{
+const vector<lbool>& ANF::getFixedValues() const {
     return replacer->getValues();
 }
 
-ANF& ANF::operator= (const ANF& other)
-{
+ANF& ANF::operator= (const ANF& other) {
     assert(updatedVars.empty() && other.updatedVars.empty());
-
     eqs = other.eqs;
     *replacer = *other.replacer;
     occur = other.occur;

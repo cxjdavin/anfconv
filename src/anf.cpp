@@ -1,6 +1,6 @@
 /*****************************************************************************
-anfconv
 Copyright (C) 2016  Security Research Labs
+Copyright (C) 2018  Mate Soos, Davin Choo
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9,16 +9,16 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ***********************************************/
 
 #include "anf.h"
@@ -31,13 +31,8 @@ using std::cout;
 using std::endl;
 using boost::lexical_cast;
 
-//#define DEBUG_EQ_READ
-
 ANF::ANF(polybori::BoolePolyRing* _ring,  ConfigData& _config) :
-    ring(_ring)
-    , config(_config)
-    , replacer(NULL)
-{
+        ring(_ring), config(_config), replacer(NULL) {
     replacer = new Replacer;
 
     //ensure that the variables are not new
@@ -49,32 +44,12 @@ ANF::ANF(polybori::BoolePolyRing* _ring,  ConfigData& _config) :
     occur.resize(ring->nVariables());
 }
 
-ANF::~ANF()
-{
+ANF::~ANF() {
     delete replacer;
 }
 
-bool ANF::isSolved() const
-{
-    //Evaluate each and every polynomial and check if it's all satisfied
-    for (const BoolePolynomial& poly : eqs) {
-        lbool ret = evaluatePoly(poly, replacer->getValues());
-        if (ret == l_False || ret == l_Undef) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-/**
- * @short Parses up a file with polynomials
-**/
-size_t ANF::readFile(
-    const std::string& filename
-    , const bool addPoly
-) {
-    //read in the file line by line
+size_t ANF::readFile(const std::string& filename, const bool addPoly) {
+    // Read in the file line by line
     vector<std::string> text_file;
 
     size_t maxVar = 0;
@@ -82,19 +57,12 @@ size_t ANF::readFile(
     std::ifstream ifs;
     ifs.open(filename.c_str());
     if (!ifs) {
-        cout << "Problem opening file: \""
-        << filename
-        << "\" for reading"
-        << endl;
-
+        cout << "Problem opening file: \"" << filename << "\" for reading\n";
         exit(-1);
     }
     std::string temp;
 
-    bool is_assumption = false;
     while( std::getline( ifs, temp ) ) {
-        is_assumption = false;
-
         // Empty lines are ignored
         if (temp.length() == 0) {
             continue;
@@ -103,19 +71,7 @@ size_t ANF::readFile(
         // Save comments
         if (temp.length() > 0 && temp[0] == 'c') {
             comments.push_back(temp);
-
-            // Skip comments
-            // But, don't skip if it's an assumption, denoted by "c ASS"
-            if (temp.length() > 4
-                && temp[0] == 'c'
-                && temp[1] == ' '
-                && temp[2] == 'A'
-                && temp[3] == 'S'
-                && temp[4] == 'S') {
-                is_assumption = true;
-            } else {
-                continue;
-            }
+            continue;
         }
 
         BoolePolynomial eq(*ring);
@@ -125,7 +81,7 @@ size_t ANF::readFile(
         bool readInDesc = false;
         size_t var = 0;
         BooleMonomial m(*ring);
-        for (uint32_t i = 0 + 5*is_assumption; i < temp.length(); i++) {
+        for (uint32_t i = 0; i < temp.length(); i++) {
 
             //Handle description separator ','
             if (temp[i] == ',') {
@@ -139,14 +95,7 @@ size_t ANF::readFile(
                 startOfVar = false;
                 readInVar = false;
                 var = 0;
-                #ifdef DEBUG_EQ_READ
-                cout << "(in ',')  Built up monomial: " << m << endl;
-                #endif
                 m = BooleMonomial(*ring);
-
-                #ifdef DEBUG_EQ_READ
-                cout << "Reading in description. BoolePolynomial was: " << eq << endl;
-                #endif
                 readInDesc = true;
                 continue;
             }
@@ -203,13 +152,7 @@ size_t ANF::readFile(
                 startOfVar = false;
                 readInVar = false;
                 var = 0;
-
-                #ifdef DEBUG_EQ_READ
-                cout << "(in '+') Built up monomial: " << m << endl;
-                #endif
-
                 m = BooleMonomial(*ring);
-
                 continue;
             }
 
@@ -263,19 +206,12 @@ size_t ANF::readFile(
             if (!readInDesc) eq += m;
             else eqDesc += m;
         }
-        #ifdef DEBUG_EQ_READ
-        cout << "(in final)  Built up monomial: " << m << endl;
-        #endif
 
         //Set state to starting position
         startOfVar = false;
         readInVar = false;
         var = 0;
         m = BooleMonomial(*ring);
-
-        #ifdef DEBUG_EQ_READ
-        cout << "Adding equation: " << eq << " , " << eqDesc << endl;
-        #endif
 
         size_t realTermsSize = eqDesc.length() - (int)eqDesc.hasConstantPart();
         if (realTermsSize > 1) {
@@ -285,7 +221,6 @@ size_t ANF::readFile(
             << endl
             << "But You gave: " << eqDesc << " on line: '" << temp << "'"
             << endl;
-
             exit(-1);
         }
 
@@ -296,21 +231,15 @@ size_t ANF::readFile(
             << endl
             << "You gave: " << eqDesc << " on line: " << temp
             << endl;
-
             exit(-1);
         }
 
         if (addPoly) {
-            if (is_assumption) {
-                assumptions.push_back(eq);
-            } else {
-                addBoolePolynomial(eq);
-            }
+            addBoolePolynomial(eq);
         }
     }
 
     ifs.close();
-
     return maxVar;
 }
 
@@ -331,7 +260,7 @@ bool ANF::addBoolePolynomial(const BoolePolynomial& poly) {
         }
     }
 
-    add_poly_to_occur(poly, eqs.size());
+    addPolyToOccur(poly, eqs.size());
     eqs.push_back(poly);
     for (const uint32_t& v : poly.usedVariables()) {
         updatedVars.insert(v);
@@ -343,30 +272,20 @@ bool ANF::addLearntBoolePolynomial(const BoolePolynomial& poly) {
     // Contextualize it to existing knowledge
     BoolePolynomial contextualized_poly = replacer->update(poly);
     bool added = addBoolePolynomial(contextualized_poly);
-    if (added && config.verbosity >= 2) {
+    if (added && config.verbosity >= 3) {
         cout << "c Adding: " << poly << endl
              << "c as: " << contextualized_poly << endl;
     }
     return added;
 }
 
-const vector<BoolePolynomial>* ANF::getContextualizedAssumptions() const {
-    vector<BoolePolynomial>* contextualized_assumptions = new vector<BoolePolynomial>();
-    for (const BoolePolynomial& poly : assumptions) {
-        contextualized_assumptions->push_back(replacer->update(poly));
-    }
-    return contextualized_assumptions;
-}
-
-void ANF::add_poly_to_occur(const BoolePolynomial& poly, const size_t eq_idx)
-{
+void ANF::addPolyToOccur(const BoolePolynomial& poly, const size_t eq_idx) {
     for (const uint32_t var_idx : poly.usedVariables()) {
         occur[var_idx].push_back(eq_idx);
     }
 }
 
-void ANF::remove_poly_from_occur(const BoolePolynomial& poly, size_t eq_idx)
-{
+void ANF::removePolyFromOccur(const BoolePolynomial& poly, size_t eq_idx) {
     //Remove from occur
     for (const uint32_t var_idx : poly.usedVariables()) {
         vector<size_t>::iterator findIt = std::find(occur[var_idx].begin(), occur[var_idx].end(), eq_idx);
@@ -388,7 +307,7 @@ void ANF::propagate() {
         updatedVars.clear();
         for (const uint32_t& var_idx : updatedVars_snapshot) {
             assert(occur.size() > var_idx);
-            if (config.verbosity >= 2) {
+            if (config.verbosity >= 5) {
                 cout << "c Updating variable " << var_idx << endl;
             }
             // We will remove and add stuff to occur, so iterate over a snapshot
@@ -396,10 +315,10 @@ void ANF::propagate() {
             for (const size_t& eq_idx : occur_snapshot) {
                 assert(eqs.size() > eq_idx);
                 BoolePolynomial& poly = eqs[eq_idx];
-                if (config.verbosity >= 2) {
+                if (config.verbosity >= 5) {
                     cout << "c equation: " << poly << endl;
                 }
-                remove_poly_from_occur(poly, eq_idx);
+                removePolyFromOccur(poly, eq_idx);
                 poly = replacer->update(poly);
 
                 if (poly.isConstant()) {
@@ -462,146 +381,31 @@ void ANF::propagate() {
                     }
 
                     // Add back to occur
-                    add_poly_to_occur(poly, eq_idx);
+                    addPolyToOccur(poly, eq_idx);
                 }
             }
         }
     }
 
     removeEmptyEquations();
-    check_simplified_polys_contain_no_set_vars();
+    checkSimplifiedPolysContainNoSetVars();
 }
 
-size_t ANF::evaluateMonoReplacement(const BooleMonomial& from_mono,
-                                    const BoolePolynomial& to_poly) {
-    // Clone system
-    vector<BoolePolynomial> cloned_system;
-    for (const BoolePolynomial& poly : eqs) {
-        cloned_system.push_back(poly);
-    }
-
-    // Try replace from_mono with to_poly
-    cloned_system.push_back(from_mono + to_poly);
-    for (BoolePolynomial& poly : cloned_system) {
-        BoolePolynomial newpoly(*ring);
-        for (const BooleMonomial& mono : poly) {
-            if (containsMono(mono, from_mono)) {
-                newpoly +=  (mono / from_mono) * to_poly;
-            } else {
-                newpoly += mono;
-            }
-        }
-        poly = newpoly;
-    }
-
-    // Evaluate metric
-    size_t metric = numUniqueMonoms(cloned_system);
-    return metric;
-}
-
-void ANF::bounded_replacement() {
-    // Consider all binary equations of the form: mono1 + mono2 = 0/1
-    // Perform greedy local replacement, similar in spirit to "Bounded variable elimination"
-
-    // Gather binary equations
-    vector<BoolePolynomial> binary_equations;
-    for (const BoolePolynomial& poly : eqs) {
-        if (poly.length() - (int) poly.hasConstantPart() == 2) {
-            binary_equations.push_back(poly);
-        }
-    }
-
-    if (binary_equations.size() * eqs.size() > 1000000000) {
-        cout << "c [ANF simp] skipped as more than 1 billion equations involved.\n";
-        return;
-    }
-
-    // For tracking the best replacement (if any beats the current system)
-    bool replacement_found = false;
-    size_t best_metric = numUniqueMonoms(eqs);
-    BooleMonomial from_mono(*ring);
-    BoolePolynomial to_poly(0, *ring);
-
-    // Loop through all possible replacements
-    size_t metric;
-    for (const BoolePolynomial& binary_eq : binary_equations) {
-        // Extract both possible replacements
-        BooleMonomial mono1 = binary_eq.terms()[0];
-        BooleMonomial mono2 = binary_eq.terms()[1];
-        BoolePolynomial poly1 = binary_eq - mono1;
-        BoolePolynomial poly2 = binary_eq - mono2;
-
-        // Try replace mono1 with poly1
-        metric = evaluateMonoReplacement(mono1, poly1);
-        if (metric < best_metric) {
-            replacement_found = true;
-            best_metric = metric;
-            from_mono = mono1;
-            to_poly = poly1;
-        }
-
-        // Try replace mono2 with poly2
-        metric = evaluateMonoReplacement(mono2, poly2);
-        if (metric < best_metric) {
-            replacement_found = true;
-            best_metric = metric;
-            from_mono = mono2;
-            to_poly = poly2;
-        }
-    }
-
-    // Perform replacement if applicable
-    if (replacement_found) {
-        if (config.verbosity >= 1) {
-            cout << "c [ANF simp] replace " << from_mono
-                 << " with " << to_poly << endl;
-        }
-        for (size_t eq_idx = 0; eq_idx < eqs.size(); eq_idx++) {
-            BoolePolynomial& poly = eqs[eq_idx];
-            if (poly == from_mono + to_poly) {
-                continue;
-            }
-            remove_poly_from_occur(poly, eq_idx);
-            BoolePolynomial newpoly(*ring);
-            for (const BooleMonomial& mono : poly) {
-                if (containsMono(mono, from_mono)) {
-                    newpoly += (mono / from_mono) * to_poly;
-                } else {
-                    newpoly += mono;
-                }
-            }
-            poly = newpoly;
-            add_poly_to_occur(poly, eq_idx);
-
-            // Check UNSAT
-            if (poly.isConstant() && poly.isOne()) {
-                replacer->setNOTOK();
-            }
-        }
-    }
-}
-
-void ANF::check_simplified_polys_contain_no_set_vars() const
-{
+void ANF::checkSimplifiedPolysContainNoSetVars() const {
     for (const BoolePolynomial& poly : eqs) {
         for (const uint32_t var_idx : poly.usedVariables()) {
             if (value(var_idx) != l_Undef) {
-                cout
-                << "ERROR: Variable "
-                << var_idx
-                << " is inside equation "
-                << poly
-                << " even though its value is "
-                << value(var_idx)
-                << " !!" << endl;
+                cout << "ERROR: Variable " << var_idx
+                     << " is inside equation " << poly
+                     << " even though its value is " << value(var_idx)
+                     << " !!\n";
                 exit(-1);
             }
         }
     }
 }
 
-void ANF::removeEmptyEquations()
-{
+void ANF::removeEmptyEquations() {
     vector<BoolePolynomial> new_eqs;
     vector<size_t> occur_delta(eqs.size(), 0);
 
@@ -627,12 +431,10 @@ void ANF::removeEmptyEquations()
             eq_idx -= occur_delta[eq_idx];
         }
     }
-
     eqs = new_eqs;
 }
 
-bool ANF::evaluate(const vector<lbool>& vals) const
-{
+bool ANF::evaluate(const vector<lbool>& vals) const {
     bool ret = true;
     for (const BoolePolynomial& poly : eqs) {
         lbool lret = evaluatePoly(poly, vals);
@@ -651,163 +453,57 @@ bool ANF::evaluate(const vector<lbool>& vals) const
     }
 
     bool toadd = replacer->evaluate(vals);
-
-    if (!toadd) cout << "Replacer not satisfied" << endl;
+    if (!toadd) {
+        cout << "Replacer not satisfied" << endl;
+        exit(-1);
+    }
     ret &= toadd;
-
     return ret;
 }
 
-void ANF::printStats(int verbosity) const
-{
-    if (verbosity >= 1) {
-        cout << "c ---- ANF stats -----" << endl;
-        cout << "c Num total vars: " << getNumVars() << endl;
-        cout << "c Num free vars: " << replacer->getNumUnknownVars() << endl;
-        cout << "c Num equations: " << size() << endl;
-        cout << "c Num monoms in eqs: " << numMonoms() << endl;
-        cout << "c Max deg in eqs: " << deg() << endl;
-        cout << "c Simple XORs: " << getNumSimpleXors() << endl;
-        cout << "c Num vars set: " << getNumSetVars() << endl;
-        cout << "c Num vars replaced: " << getNumReplacedVars() << endl;
-        cout << "c --------------------" << endl;
-    }
-}
-
-/**
- * @short Checks if occurrance list is (partially) OK
-**/
-void ANF::checkOccur() const
-{
+void ANF::checkOccur() const {
     for (const vector<size_t>& var_occur : occur) {
         for (const size_t eq_idx : var_occur) {
             assert(eq_idx < eqs.size());
         }
     }
-
-    if (config.verbosity >= 2) {
+    if (config.verbosity >= 3) {
         cout << "Sanity check passed" << endl;
     }
 }
 
-void ANF::preferLowVars()
-{
-    set<uint32_t> updatedVars2 = replacer->preferLowVars();
-    updatedVars.insert(updatedVars2.begin(), updatedVars2.end());
-    bounded_replacement();
-}
-
-void ANF::extractVariables(
-    const size_t from
-    , const size_t to
-    , const vector<lbool>* sol
-) const {
-    uint64_t ret = 0;
-    bool unknown_inside = false;
-    for (size_t i = from, at = 0; i <= to; i++, at++) {
-        bool setAlready = false;
-
-        lbool val = getFixedValues()[i];
-        if (val == l_False
-            || (sol && sol->size() > i && (*sol)[i] == l_False)
-        ) {
-            cout << "0";
-            setAlready = true;
-            continue;
-        }
-
-        if (val == l_True
-            || (sol && sol->size() > i && (*sol)[i] == l_True)
-        ) {
-            if (setAlready) {
-                cout << "OOOOOOPS" << endl;
-                exit(-1);
-            }
-            ret |= ((uint64_t)1) << ((to-from-1)-at);
-            cout << "1";
-            setAlready = true;
-            continue;
-        }
-
-        if (val == l_Undef) {
-            cout << "?";
-            unknown_inside = true;
-            continue;
-        }
-
-        assert(false);
-    }
-    cout << endl;
-
-    if (unknown_inside) {
-        cout
-        << "Cannot give HEX representation, because unknown value was inside"
-        << endl;
-    } else if (to-from+1 > 64) {
-        cout
-        << "Cannot give HEX representation, because there were more than 64 bits"
-        << endl;
-    } else {
-        cout << "In HEX: "
-        << std::hex << std::setfill('0')
-        << std::setw((to-from+1)/4 + (bool)((to-from+1) % 4))
-        << ret
-        << std::dec
-        << endl;
-    }
-}
-
-
-ANF* ANF::minimise(
-    vector<uint32_t>& oldToNewMap
-    , vector<uint32_t>& newToOldMap
-) {
-    vector<uint32_t> unknown = replacer->getUnknownVars();
-    newToOldMap.resize(unknown.size(), std::numeric_limits<uint32_t>::max());
-    oldToNewMap.resize(getNumVars(), std::numeric_limits<uint32_t>::max());
-
-    for (size_t i = 0; i < unknown.size(); i++) {
-        uint32_t oldVar = unknown[i];
-        vector<uint32_t> replaces = replacer->getReplacesVars(oldVar);
-
-        //Replaces itself and others
-        oldToNewMap[oldVar] = i;
-        for (uint32_t var: replaces) {
-            oldToNewMap[var] = i;
-        }
-
-        newToOldMap[i] = oldVar;
-    }
-
-    BoolePolyRing* newring = new BoolePolyRing(unknown.size());
-    ANF* newanf = new ANF(newring, config);
-
-    // Update each polynomial in system
+size_t ANF::evaluateMonoReplacement(const BooleMonomial& from_mono,
+                                    const BoolePolynomial& to_poly,
+                                    bool include_equation) {
+    // Clone system
+    vector<BoolePolynomial> cloned_system;
     for (const BoolePolynomial& poly : eqs) {
-        BoolePolynomial newpoly(*newring);
-
-        // Update each monomial in polynomial
-        for (const BooleMonomial& mono : poly) {
-            BooleMonomial newm(*newring);
-
-            // Update each variable in monomial
-            for (const uint32_t var_idx : mono) {
-                assert(oldToNewMap.size() > var_idx);
-                assert(oldToNewMap[var_idx] != std::numeric_limits<uint32_t>::max());
-                uint32_t newVar = oldToNewMap[var_idx];
-                newm *= BooleVariable(newVar, *newring);
-            }
-            newpoly += newm;
-        }
-
-        newanf->addBoolePolynomial(newpoly);
+        cloned_system.push_back(poly);
     }
 
-    return newanf;
+    // Try replace from_mono with to_poly
+    if (include_equation) {
+        cloned_system.push_back(from_mono + to_poly);
+    }
+    for (BoolePolynomial& poly : cloned_system) {
+        BoolePolynomial newpoly(*ring);
+        for (const BooleMonomial& mono : poly) {
+            if (containsMono(mono, from_mono)) {
+                newpoly +=  (mono / from_mono) * to_poly;
+            } else {
+                newpoly += mono;
+            }
+        }
+        poly = newpoly;
+    }
+
+    // Evaluate metric
+    size_t metric = numUniqueMonoms(cloned_system);
+    return metric;
 }
 
 // Implementation based on https://infoscience.epfl.ch/record/176270/files/ElimLin_full_version.pdf
-int ANF::elimlin() {
+int ANF::elimLin() {
     vector<size_t> linear_indices;
     vector<BoolePolynomial> all_equations;
     vector<BoolePolynomial> learnt_equations;
@@ -821,16 +517,19 @@ int ANF::elimlin() {
     bool fixedpoint = false;
     while (!fixedpoint) {
         fixedpoint = true;
-        if (all_equations.size() * numUniqueMonoms(all_equations) > 1000000000) {
-            cout << "c Matrix has over 1 billion cells. Break out of EL loop\n";
+        if (!config.nolimiters &&
+            all_equations.size() * numUniqueMonoms(all_equations) > 1000000000) {
+            if (config.verbosity >= 3) {
+                cout << "c Matrix has over 1 billion cells. Break out of EL loop\n";
+            }
             break;
         }
 
         // Perform Gauss Jordan
-        GaussJordan gj(all_equations, *ring);
+        GaussJordan gj(all_equations, *ring, config.verbosity);
         gj.run(linear_indices, all_equations);
 
-        if (config.verbosity >= 1) {
+        if (config.verbosity >= 3) {
             cout << "c Processing " << linear_indices.size() << " linear equations"
                  << "in a system with " << all_equations.size() << " equations\n";
         }
@@ -848,7 +547,7 @@ int ANF::elimlin() {
                 size_t best_metric = std::numeric_limits<std::size_t>::max();
                 for (const BooleMonomial& mono : linear_eq) {
                     const BoolePolynomial poly = linear_eq - mono;
-                    size_t metric = evaluateMonoReplacement(mono, poly);
+                    size_t metric = evaluateMonoReplacement(mono, poly, false);
                     if (metric < best_metric) {
                         best_metric = metric;
                         from_mono = mono;
@@ -857,7 +556,7 @@ int ANF::elimlin() {
                 }
                 assert(from_mono.deg() == 1);
                 uint32_t var_to_replace = from_mono.firstVariable().index();
-                if (config.verbosity >= 2) {
+                if (config.verbosity >= 5) {
                     cout << "c Replacing " << linear_eq.firstTerm().firstVariable()
                          << " with " << poly_to_replace << endl;
                 }
@@ -886,7 +585,7 @@ int ANF::elimlin() {
                             }
                             newpoly += newmono;
                         }
-                        if (config.verbosity >= 2) {
+                        if (config.verbosity >= 5) {
                             cout << "c EL: " << poly << " => " << newpoly << endl;
                         }
 
@@ -925,6 +624,5 @@ int ANF::elimlin() {
             }
         }
     }
-    cout << "c EL learnt " << linear_count << " linear equations\n";
     return num_learnt;
 }

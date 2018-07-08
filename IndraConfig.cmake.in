@@ -1,0 +1,16 @@
+# Config file for the @EXPORT_TYPE@ STP Package
+# It defines the following variables
+#  Indra_INCLUDE_DIRS - include directories for Indra
+#  Indra_LIBRARIES    - libraries to link against
+#  Indra_EXECUTABLE   - the Indra executable
+
+# Compute paths
+get_filename_component(Indra_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(Indra_INCLUDE_DIRS "@CONF_INCLUDE_DIRS@")
+
+# Our library dependencies (contains definitions for IMPORTED targets)
+include("${Indra_CMAKE_DIR}/@Indra_TARGETS_FILENAME@")
+
+# These are IMPORTED targets created by @Indra_TARGETS_FILENAME@
+set(Indra_LIBRARIES libIndra)
+set(Indra_EXECUTABLE Indra)

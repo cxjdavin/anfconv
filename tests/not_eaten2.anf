@@ -1,0 +1,2 @@
+c RUN: %solver --anfread %s --custom --printfinal | %check %s.out
+x1 + x2

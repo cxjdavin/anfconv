@@ -1,5 +1,8 @@
 # About
-An ANF simplification tool forked from: https://github.com/msoos/anfconv
+
+TO DO
+
+Historic note: Indra is originally, an ANF simplification tool forked from https://github.com/msoos/anfconv.
 
 # Installation
 
@@ -32,26 +35,25 @@ cmake ..
 make -j4
 sudo make install
 ```
-
 Note (For MacOS): If you encounter `cryptominisat.h:30:10: fatal error: 'atomic' file not found` in `#include <atomic>` during compilation, you may need to use `CFLAGS='-stdlib=libc++' make` instead of just `make`.
 
-### anfconv (This tool!)
+### Indra (This tool!)
 ```
-git clone https://github.com/cxjdavin/anfconv.git
-cd anfconv
+git clone https://github.com/cxjdavin/indra.git
+cd indra
 mkdir build
 cd build
 cmake ..
 make -j4
 ```
-You can now run using the executable `anfconv` in the `build` directory.
+Use `cmake -DSTATICCOMPILE=ON ..` instead if you wish to compile statically. You may now run using the executable `indra` in the `build` directory.
 
 ### For testing: [LLVM lit](https://github.com/llvm-mirror/llvm/tree/master/utils/lit) and [stp OutputCheck](https://github.com/stp/OutputCheck)
 ```
 pip install lit
 pip install OutputCheck
 ```
-Run test suite via `lit <directory>/anfconv/anf_tests`
+Run test suite via `lit <directory>/indra/tests`
 
 # Usage
 
@@ -65,8 +67,9 @@ x1 + x2 + x3
 x1*x2 + x2*x3 + 1
 ```
 
-Running `./anfconv --elsimp -r readme.anf -a readme.anf.out` will apply ElimLin simplification to `readme.anf` and write it out to `readme.anf.out` as follows:
+Running `./indra --anfread readme.anf --anfwrite readme.anf.out --custom --elsimp` will apply only the ElimLin simplification (ignoring other processes that the tool offers) to `readme.anf` and write it out to `readme.anf.out`. `readme.anf.out` will then ßcontain the following:
 ```
+c Executed arguments: --anfread readme.anf --anfwrite readme.anf.out --custom --elsimp
 c -------------
 c Fixed values
 c -------------
@@ -91,4 +94,20 @@ i.e. There are 2 solutions:
 * (x1, x2, x3) = (1,1,0)
 * (x1, x2, x3) = (0,1,1)
 
-See `./anfconv -h` for the full list of options.
+See `./indra -h` for the full list of options.
+
+### What is printed by different verbosity levels
+(Note: Level N also prints everything from Level 0 to Level N-1)
+
+###### Level 0
+Error messages
+###### Level 1 (Default)
+Basic ANF/CNF statistics
+###### Level 2
+Some simplification information (e.g. Summary of each simplification step)
+###### Level 3
+More detailed simplification information (e.g. Prints matrix sizes)
+###### Level 4
+Even more detailed simplification information (e.g. Prints matrix before and after Gauss Jordan Elimination)
+###### Level 5
+Warning! Data dump from this point onwards

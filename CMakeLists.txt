@@ -6,7 +6,7 @@ ELSE()
   SET(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.")
 ENDIF()
 
-PROJECT(anfconv)
+PROJECT(indra)
 SET(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 macro(add_cxx_flag flagname)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${flagname}")
@@ -89,9 +89,9 @@ get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 
 find_package(M4RI REQUIRED)
 include_directories(${M4RI_INCLUDE_DIRS})
-link_directories(${anfconv_BINARY_DIR}/espresso)
+link_directories(${indra_BINARY_DIR}/espresso)
 
-set(ANFCONV_EXPORT_NAME "anfconvTargets")
+set(indra_EXPORT_NAME "indraTargets")
 
 add_subdirectory(espresso)
 add_subdirectory(src)
@@ -109,49 +109,49 @@ add_custom_target(uninstall
 
 # -----------------------------------------------------------------------------
 # Export our targets so that other CMake based projects can interface with
-# the build of anfconv in the build-tree
+# the build of indra in the build-tree
 # -----------------------------------------------------------------------------
-set(ANFCONV_TARGETS_FILENAME "anfconvTargets.cmake")
-set(ANFCONV_CONFIG_FILENAME "anfconvConfig.cmake")
+set(indra_TARGETS_FILENAME "indraTargets.cmake")
+set(indra_CONFIG_FILENAME "indraConfig.cmake")
 
 # Export targets
-export(TARGETS libanfconv anfconv FILE "${PROJECT_BINARY_DIR}/${ANFCONV_TARGETS_FILENAME}")
+export(TARGETS libindra indra FILE "${PROJECT_BINARY_DIR}/${indra_TARGETS_FILENAME}")
 
-# Create anfconvConfig file
+# Create indraConfig file
 set(EXPORT_TYPE "Build-tree")
 set(CONF_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/include")
-configure_file(anfconvConfig.cmake.in
-    "${CMAKE_BINARY_DIR}/${ANFCONV_CONFIG_FILENAME}" @ONLY
+configure_file(indraConfig.cmake.in
+    "${CMAKE_BINARY_DIR}/${indra_CONFIG_FILENAME}" @ONLY
 )
 
 # Export this package to the CMake user package registry
-# Now the user can just use find_package(anfconv) on their system
-export(PACKAGE anfconv)
+# Now the user can just use find_package(indra) on their system
+export(PACKAGE indra)
 
-set(DEF_INSTALL_CMAKE_DIR lib/cmake/anfconv)
-set(ANFCONV_INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH
-    "Installation directory for anfconv CMake files")
+set(DEF_INSTALL_CMAKE_DIR lib/cmake/indra)
+set(indra_INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH
+    "Installation directory for indra CMake files")
 
-# Create anfconvConfig file
+# Create indraConfig file
 set(EXPORT_TYPE "installed")
 set(CONF_INCLUDE_DIRS "${CMAKE_INSTALL_PREFIX}/include")
-configure_file(anfconvConfig.cmake.in
-   "${CMAKE_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${ANFCONV_CONFIG_FILENAME}" @ONLY
+configure_file(indraConfig.cmake.in
+   "${CMAKE_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${indra_CONFIG_FILENAME}" @ONLY
 )
 
 install(FILES
-    "${CMAKE_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${ANFCONV_CONFIG_FILENAME}"
-    DESTINATION "${ANFCONV_INSTALL_CMAKE_DIR}"
+    "${CMAKE_BINARY_DIR}/${CMAKE_FILES_DIRECTORY}/${indra_CONFIG_FILENAME}"
+    DESTINATION "${indra_INSTALL_CMAKE_DIR}"
 )
 
 # Install the export set for use with the install-tree
-install(EXPORT ${ANFCONV_EXPORT_NAME} DESTINATION
-    "${ANFCONV_INSTALL_CMAKE_DIR}"
+install(EXPORT ${indra_EXPORT_NAME} DESTINATION
+    "${indra_INSTALL_CMAKE_DIR}"
 )
 
-set(CPACK_PACKAGE_NAME "anfconv")
+set(CPACK_PACKAGE_NAME "indra")
 set(CPACK_PACKAGE_VENDOR "")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "An ANF minimizerr")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "An ANF/CNF processing tool")
 set(CPACK_PACKAGE_VERSION "1.0.0")
 set(CPACK_PACKAGE_VERSION_MAJOR "1")
 set(CPACK_PACKAGE_VERSION_MINOR "0")
@@ -176,5 +176,3 @@ set(CPACK_SOURCE_IGNORE_FILES
 include(CPack)
 
 add_custom_target(dist COMMAND ${CMAKE_MAKE_PROGRAM} package_source)
-
-

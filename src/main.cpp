@@ -1,6 +1,6 @@
 /*****************************************************************************
-anfconv
 Copyright (C) 2016  Security Research Labs
+Copyright (C) 2018  Mate Soos, Davin Choo
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9,79 +9,47 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ***********************************************/
 
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
+#include <deque>
+#include <fstream>
+#include <memory>
+#include <sys/wait.h>
+
 #include "anf.h"
 #include "cnf.h"
 #include "gaussjordan.h"
-#include <fstream>
-#include <sys/wait.h>
-#include "time_mem.h"
-#include <fstream>
+#include "GitSHA1.h"
+#include "replacer.h"
 #include "satsolve.h"
 #include "simplifybysat.h"
-#include "replacer.h"
-#include "GitSHA1.h"
-#include <memory>
-#include <deque>
+#include "time_mem.h"
 
-//#define DEBUG_EXTRACTION
 using std::cout;
 using std::cerr;
 using std::endl;
 using std::string;
 using std::deque;
 
-string anf_input;
-string anf_output;
-string cnf_input;
-string cnf_output;
-string programName;
-
-//Writing options
-bool printSimpANF;
-bool writeANF;
-bool writeCNF;
-
-//Solving options
-bool doSolveSAT; //Solve using CryptoMiniSat
-
-//Dependency
-int renumber_ring_vars;
-
-//How to simplify
-bool doAllSimplify;
-bool doANFSimplify;
-bool doGJSimplify;
-bool doXLSimplify;
-bool doELSimplify;
-bool doSATSimplify;
-
-//Parameters
 ConfigData config;
-uint32_t xl_deg;
-uint64_t numConfl;
-vector<string> extractString;
-string executed_args = "";
 
-void parseOptions(int argc, char *argv[])
-{
+void parseOptions(int argc, char *argv[]) {
     // Store executed arguments to print in output comments
     for (int i=1 ; i < argc; i++) {
-        executed_args.append(string(argv[i]).append(" "));
+        config.executedArgs.append(string(argv[i]).append(" "));
     }
 
     // Declare the supported options.
@@ -89,58 +57,49 @@ void parseOptions(int argc, char *argv[])
     generalOptions.add_options()
     ("help,h", "produce help message")
     ("version", "print version number and exit")
-    ("anfread,r", po::value(&anf_input)
-        , "Read ANF from this file")
-    ("cnfread", po::value(&cnf_input)
-        , "Read CNF from this file")
-    ("anfwrite,a", po::value(&anf_output)
-        , "Write ANF output to file")
-    ("cnfwrite,c", po::value(&cnf_output)
-        , "Write CNF output to file")
-    ("solvesat,s", po::bool_switch(&doSolveSAT)
-        , "Solve with SAT solver")
-    ("printdeg", po::value(&config.max_degree_poly_to_print)->default_value(-1)
-        , "Print only final polynomials of degree lower or equal to this. -1 means print all")
-    ("karn", po::value(&config.useKarn)->default_value(config.useKarn)
-        , "Use Karnaugh table minimisation")
-    ("program,p", po::value(&programName)->default_value("/usr/local/bin/cryptominisat")
-        , "SAT solver to use with full path")
-    ("verbosity,v", po::value(&config.verbosity)->default_value(1)
-        , "Verbosity setting (0 = silent)")
-    ("printsimp", po::bool_switch(&printSimpANF)
-        , "Print simplified ANF. Default = false (for cleaner terminal output)")
-    ("dump,d", po::bool_switch(&config.writePNG)
-         , "Dump XL's and linearization's matrixes as PNG files")
-    ("allsimp", po::bool_switch(&doAllSimplify)
-         , "Apply all simplification tricks")
-    ("anfsimp", po::bool_switch(&doANFSimplify)
-         , "Simplify ANF before doing anything")
-    ("gjsimp", po::bool_switch(&doGJSimplify)
-         , "Simplify using GaussJordan")
-    ("xlsimp", po::bool_switch(&doXLSimplify)
-         , "Simplify using XL (performs GaussJordan internally)")
-    ("xldeg", po::value<uint32_t>(&xl_deg)->default_value(1)
-         , "Expansion degree for XL algorithm. Default = 1 (for now we only support up to xldeg = 3)")
-    ("elsimp", po::bool_switch(&doELSimplify)
-         , "Simplify using ElimLin (performs GaussJordan internally)")
-    ("satsimp", po::bool_switch(&doSATSimplify)
-         , "Simplify using SAT")
-    ("confl", po::value<uint64_t>(&numConfl)->default_value(100000)
-        , "Conflict limit for built-in SAT solver. Default = 100000")
-    ("cutnum", po::value(&config.cutNum)->default_value(config.cutNum)
-        , "Cutting number when not using XOR clauses")
-    ("extract,e", po::value(&extractString)->multitoken()
-        , "Extract the values of these variables as binary string from final ANF. \
-             Must be like '10-20' for extracting x10...x20")
-    ("revar", po::value(&renumber_ring_vars)->default_value(0)
-        , "Minimise (renumber) ANF before attempting dependency calculation. Reduces ring size")
+    // Input/Output
+    ("anfread", po::value(&config.anfInput), "Read ANF from this file")
+    ("cnfread", po::value(&config.cnfInput), "Read CNF from this file")
+    ("anfwrite", po::value(&config.anfOutput), "Write ANF output to file")
+    ("cnfwrite", po::value(&config.cnfOutput), "Write CNF output to file")
+    ("printfinal", po::bool_switch(&config.printProcessedANF)->default_value(false),
+        "Print final processed ANF. Default = false (for cleaner terminal output)")
+    ("verbosity,v", po::value<uint32_t>(&config.verbosity)->default_value(1),
+        "Verbosity setting (0 = silent)")
+    // CNF conversion
+    ("cutnum", po::value<uint32_t>(&config.cutNum)->default_value(4),
+        "Cutting number when not using XOR clauses")
+    ("karn", po::value(&config.maxKarnTableSize)->default_value(8),
+        "Sets Karnaugh map dimension during CNF conversion")
+    // Processes
+    ("nosimp", po::bool_switch(&config.skipSimplify)->default_value(false),
+        "Disable application of simplifications. Just do filetype conversion.")
+    ("nolimiters", po::bool_switch(&config.nolimiters)->default_value(false),
+        "Disable limiters on simplification processes.")
+    ("custom", po::bool_switch(&config.custom)->default_value(false),
+        "Disables running all simplification processes. Manually switch on each of them.")
+    ("gjsimp", po::bool_switch(&config.doGJSimplify)->default_value(false),
+        "Simplify using GaussJordan")
+    ("xlsimp", po::bool_switch(&config.doXLSimplify)->default_value(false),
+        "Simplify using XL (performs GaussJordan internally)")
+    ("xldeg", po::value<uint32_t>(&config.xlDeg)->default_value(1),
+        "Expansion degree for XL algorithm. Default = 1 (for now we only support up to xldeg = 3)")
+    ("elsimp", po::bool_switch(&config.doELSimplify)->default_value(false),
+        "Simplify using ElimLin (performs GaussJordan internally)")
+    ("satsimp", po::bool_switch(&config.doSATSimplify)->default_value(false),
+        "Simplify using SAT")
+    ("confl", po::value<uint64_t>(&config.numConfl)->default_value(100000),
+        "Conflict limit for built-in SAT solver. Default = 100000")
+    // Solve processed CNF
+    ("solvesat,s", po::bool_switch(&config.doSolveSAT), "Solve with SAT solver")
+    ("solverexe,e", po::value(&config.solverExe)->default_value("/usr/local/bin/cryptominisat"),
+        "Solver executable (for SAT solving on processed CNF)")
+    ("solvewrite,o", po::value(&config.solutionOutput), "Write solver output to file")
     ;
 
     po::variables_map vm;
     po::options_description cmdline_options;
-    cmdline_options
-    .add(generalOptions)
-    ;
+    cmdline_options.add(generalOptions);
 
     try {
         po::store(
@@ -149,13 +108,10 @@ void parseOptions(int argc, char *argv[])
             .run()
             , vm
         );
-
-        if (vm.count("help"))
-        {
+        if (vm.count("help")) {
             cout << generalOptions << endl;
             exit(0);
         }
-
         po::notify(vm);
     } catch (boost::exception_detail::clone_impl<
         boost::exception_detail::error_info_injector<po::unknown_option> >& c
@@ -173,7 +129,6 @@ void parseOptions(int argc, char *argv[])
         << "Invalid value '" << what.what() << "'"
         << " given to option '" << what.get_option_name() << "'"
         << endl;
-
         exit(-1);
     } catch (boost::exception_detail::clone_impl<
         boost::exception_detail::error_info_injector<po::multiple_occurrences> > what
@@ -182,7 +137,6 @@ void parseOptions(int argc, char *argv[])
         << "Error: " << what.what() << " of option '"
         << what.get_option_name() << "'"
         << endl;
-
         exit(-1);
     } catch (boost::exception_detail::clone_impl<
         boost::exception_detail::error_info_injector<po::required_option> > what
@@ -191,426 +145,81 @@ void parseOptions(int argc, char *argv[])
         << "You forgot to give a required option '"
         << what.get_option_name() << "'"
         << endl;
-
         exit(-1);
     }
 
     if (vm.count("version")) {
-        cout << "anfconv " << get_git_version() << endl;
+        cout << "INDRA " << get_git_version() << endl;
         exit(0);
     }
 
-    // Reading methods
-    if (!vm.count("anfread") && !vm.count("cnfread")) {
+    // I/O checks
+    if (vm.count("anfread")) {
+        config.readANF = true;
+    }
+    if (vm.count("cnfread")) {
+        config.readCNF = true;
+    }
+    if (vm.count("anfwrite")) {
+        config.writeANF = true;
+    }
+    if (vm.count("cnfwrite")) {
+        config.writeCNF = true;
+    }
+    if (!config.readANF && !config.readCNF) {
         cout << "You must give an ANF/CNF file to read in\n";
         exit(-1);
     }
-    if (vm.count("anfread") && vm.count("cnfread")) {
+    if (config.readANF && config.readCNF) {
         cout << "You cannot give both ANF/CNF files to read in\n";
         exit(-1);
     }
 
-    //Writing methods
-    if (vm.count("anfwrite")) {
-        writeANF = true;
+    // Config checks
+    if (config.skipSimplify && config.custom) {
+        cout << "ERROR! You cannot skip all and add custom simplifications simultaneously\n";
+        exit(-1);
     }
-    if (vm.count("cnfwrite")) {
-        writeCNF = true;
-    }
-
     if (config.cutNum < 3 || config.cutNum > 10) {
-        cout
-        << "ERROR! For sanity, cutting number must be between 3 and 10"
-        << endl;
-
+        cout << "ERROR! For sanity, cutting number must be between 3 and 10\n";
+        exit(-1);
+    }
+    if (config.maxKarnTableSize > 20) {
+        cout << "ERROR! For sanity, max Karnaugh table size is at most 20\n";
+        exit(-1);
+    }
+    if (config.xlDeg > 3) {
+        cout << "ERROR! We only currently support up to xldeg = 3\n";
+        exit(-1);
+    }
+    if (config.doSolveSAT && !vm.count("solvewrite")) {
+        cout << "ERROR! Provide a output file for the solving of the processed CNF\n";
         exit(-1);
     }
 }
 
-std::pair<uint32_t, uint32_t> get_var_range(const string& extractString, uint32_t max_var)
-{
-    const size_t pos = extractString.find("-");
-    if (pos == string::npos) {
-        std::cerr
-        << "ERROR: you gave a variable range but your string doesn't contain '-'"
-        << endl;
-        exit(-1);
-    }
+ANF* read_anf() {
+    // Find out maxVar in input ANF file
+    BoolePolyRing* ring_tmp = new BoolePolyRing(1);
+    ANF* anf_tmp = new ANF(ring_tmp, config);
+    size_t maxVar = anf_tmp->readFile(config.anfInput, false);
 
-    //Extract TO and FROM
-    int from;
-    int to;
-    try {
-        from = boost::lexical_cast<int>(extractString.substr(0,pos));
-        assert(extractString[pos] == '-');
-        to = boost::lexical_cast<int>(extractString.substr(pos+1,extractString.size()-pos-1));
-    } catch (boost::bad_lexical_cast& b) {
-        cout
-        << "ERROR: either TO or FROM given to --extract couldn't be converted to integer: "
-        << endl
-        << b.what()
-        << " -- maybe not an integer?"
-        << endl;
-
-        exit(-1);
-    }
-
-    //User feedback
-    cout
-    << "Extracting values "
-    << from << " - " << to
-    << endl;
-
-    //Sanity checks
-    if (from < 0 || to < 0)  {
-        std::cerr
-        << "ERROR: During extraction, the FROM or the TO parameter is smaller than 0"
-        << endl;
-        exit(-1);
-    }
-
-    if (to < from) {
-        std::cerr
-        << "ERROR: During extraction, you gave the FROM value to be larger than the TO value"
-        << endl;
-        exit(-1);
-    }
-
-    if (max_var < (size_t)to) {
-        std::cerr
-        << "ERROR: During extraction, the TO you gave is higher than the number of variables in the ANF"
-        << "( " << max_var << ")"
-        << endl;
-        exit(-1);
-    }
-
-    return std::make_pair(from, to);
-}
-
-uint32_t get_var(const string var_num, const uint32_t max_var)
-{
-    uint32_t var = boost::lexical_cast<int>(var_num);
-    assert(var < max_var);
-    return var;
-}
-
-size_t get_ringsize(const string anf_filename)
-{
-    BoolePolyRing* ring = new BoolePolyRing(1);
+    // Construct ANF
+    // ring size = maxVar + 1, because ANF variables start from x0
+    BoolePolyRing* ring = new BoolePolyRing(maxVar + 1);
     ANF* anf = new ANF(ring, config);
-    const size_t ring_size = anf->readFile(anf_filename, false);
-    cout << "c Needed ring size is " << ring_size+1 << endl;
-    return ring_size;
-}
-
-// Returns n choose r
-// Note: Assume no overflow
-uint32_t nCr(uint32_t n, uint32_t r) {
-    assert(r <= n);
-    uint32_t b = std::min(r, n-r);
-    uint32_t ans = 1;
-    for (uint32_t i = n; i > n-b; --i) {
-        ans *= i;
-    }
-    for (uint32_t i = 1; i <= b; ++i) {
-        ans /= i;
-    }
-    return ans;
-}
-
-void simplify(ANF* anf, const ANF& orig_anf)
-{
-    double loopStartTime = cpuTime();
-
-    if (doAllSimplify) {
-        doANFSimplify = true;
-        doGJSimplify = true;
-        doXLSimplify = true;
-        doELSimplify = true;
-        doSATSimplify = true;
-    }
-    if (config.verbosity>=1) {
-        cout << "c Begin simplifying of ANF..." << endl
-             << "c ANF simp: " << doANFSimplify << endl
-             << "c GJ simp: " << doGJSimplify << endl
-             << "c XL simp (deg = " << xl_deg << "): " << doXLSimplify << endl
-             << "c EL simp: " << doELSimplify << endl
-             << "c SAT simp (confl limit = " << numConfl << "): " << doSATSimplify << endl;
-    }
-
-    // Perform initial propagation to avoid needing >= 2 iterations
-    anf->propagate();
-
-    uint32_t numIters = 0;
-    bool changed = true;
-    while (changed && anf->getOK()) {
-        changed = false;
-
-        // Apply Gauss Jordan simplification
-        if (doGJSimplify) {
-            double startTime = cpuTime();
-            int num_learnt = 0;
-
-            if (anf->size() * anf->numUniqueMonoms(anf->getEqs()) > 1000000000) {
-                cout << "c Matrix has over 1 billion cells. Skip GJE\n";
-            } else {
-                GaussJordan gj(anf->getEqs(), anf->getRing());
-                vector<BoolePolynomial> truths_from_gj;
-                gj.run(truths_from_gj);
-                for(BoolePolynomial poly : truths_from_gj) {
-                    num_learnt += anf->addLearntBoolePolynomial(poly);
-                }
-            }
-
-            if (config.verbosity >= 1) {
-                cout << "c [Gauss Jordan] learnt " << num_learnt << " new facts in "
-                     << (cpuTime() - startTime) << " seconds." << endl;
-            }
-            changed |= (num_learnt != 0);
-        }
-
-        // Apply XL simplification (includes Gauss Jordan)
-        if (doXLSimplify) {
-            double startTime = cpuTime();
-            int num_learnt = 0;
-
-            if (xl_deg > 3) {
-               cout << "c We only currently support up to xldeg = 3" << endl;
-               assert(false);
-            }
-
-            int multiplier = 0;
-            for (uint32_t d = 0; d <= xl_deg; ++d) {
-                // Add (n choose d)
-                multiplier += nCr(anf->getRing().nVariables(), d);
-            }
-            if (anf->size() == 0) {
-                cout << "c System is empty. Skip XL\n";
-            } else if ((double) anf->size() * anf->getRing().nVariables() > 1000000000 / multiplier) {
-                cout << "c Matrix has over 1 billion cells. Skip XL\n"
-                     << "c (This is a lower bound estimate assuming no change in numUniqueMonoms)\n";
-            } else {
-                vector<BoolePolynomial> equations;
-                for (const BoolePolynomial& poly : anf->getEqs()) {
-                    equations.push_back(poly);
-                }
-
-                // ugly hack
-                // To do: Use an efficient implementation of "nVars choose xl_deg"
-                //        from http://howardhinnant.github.io/combinations.html?
-                unsigned long nVars = anf->getRing().nVariables();
-                if (xl_deg >= 1) {
-                    for (unsigned long i = 0; i < nVars; ++i) {
-                        BooleVariable v = anf->getRing().variable(i);
-                        for (const BoolePolynomial& poly : anf->getEqs()) {
-                            equations.push_back(BoolePolynomial(v * poly));
-                        }
-                    }
-                }
-                if (xl_deg >= 2) {
-                    for (unsigned long i = 0; i < nVars; ++i) {
-                        for (unsigned long j = i+1; j < nVars; ++j) {
-                            BooleVariable v1 = anf->getRing().variable(i);
-                            BooleVariable v2 = anf->getRing().variable(j);
-                            for (const BoolePolynomial& poly : anf->getEqs()) {
-                                equations.push_back(BoolePolynomial(v1 * v2 * poly));
-                            }
-                        }
-                    }
-                }
-                if (xl_deg >= 3) {
-                    for (unsigned long i = 0; i < nVars; ++i) {
-                        for (unsigned long j = i+1; j < nVars; ++j) {
-                            for (unsigned long k = j+1; k < nVars; ++k) {
-                                BooleVariable v1 = anf->getRing().variable(i);
-                                BooleVariable v2 = anf->getRing().variable(j);
-                                BooleVariable v3 = anf->getRing().variable(k);
-                                for (const BoolePolynomial& poly : anf->getEqs()) {
-                                    equations.push_back(BoolePolynomial(v1 * v2 * v3 * poly));
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if ((double) equations.size() > 1000000000 / anf->numUniqueMonoms(equations)) {
-                    cout << "c Matrix has over 1 billion cells. Skip XL\n";
-                } else {
-                    GaussJordan gj(equations, anf->getRing());
-                    vector<BoolePolynomial> truths_from_gj;
-                    gj.run(truths_from_gj);
-                    for(BoolePolynomial poly : truths_from_gj) {
-                        num_learnt += anf->addLearntBoolePolynomial(poly);
-                    }
-                }
-            }
-
-            if (config.verbosity >= 1) {
-                cout << "c [XL] learnt " << num_learnt << " new facts in "
-                     << (cpuTime() - startTime) << " seconds." << endl;
-            }
-            changed |= (num_learnt != 0);
-        }
-
-        // Apply ElimLin simplification (includes Gauss Jordan)
-        if (doELSimplify) {
-            double startTime = cpuTime();
-            int num_learnt = anf->elimlin();
-            if (config.verbosity >= 1) {
-                cout << "c [ElimLin] learnt " << num_learnt << " new facts in "
-                     << (cpuTime() - startTime) << " seconds." << endl;
-            }
-            changed |= (num_learnt != 0);
-        }
-
-        // Apply SAT simplification (run CMS, then extract learnt clauses)
-        if (doSATSimplify) {
-            double startTime = cpuTime();
-            SimplifyBySat simpsat(*anf, orig_anf, config, numConfl);
-            int num_learnt = simpsat.simplify();
-            if (config.verbosity >= 1) {
-                cout << "c [Cryptominisat] learnt " << num_learnt << " new facts in "
-                     << (cpuTime() - startTime) << " seconds." << endl;
-            }
-            changed |= (num_learnt != 0);
-        }
-
-        // Apply ANF simplification
-        // Do not update changed if using ANF simplification
-        if (doANFSimplify) {
-            cout << "c [Bounded] Number of unique monomials before bounded replacement: "
-                 << anf->numUniqueMonoms(anf->getEqs()) << endl;
-            anf->bounded_replacement();
-            cout << "c [Bounded] Number of unique monomials after  bounded replacement: "
-                 << anf->numUniqueMonoms(anf->getEqs()) << endl;
-            anf->propagate();
-        } else {
-            uint64_t initial_set_vars = anf->getNumSetVars();
-            uint64_t initial_eq_num = anf->size();
-            uint64_t initial_monom_in_eq = anf->numMonoms();
-            uint64_t initial_deg = anf->deg();
-            uint64_t initial_simp_xors = anf->getNumSimpleXors();
-            uint64_t initial_replaced_vars = anf->getNumReplacedVars();
-            anf->propagate();
-            changed |= (anf->getNumSetVars() != initial_set_vars);
-            changed |= (anf->size() != initial_eq_num);
-            changed |= (anf->numMonoms() != initial_monom_in_eq);
-            changed |= (anf->deg() != initial_deg);
-            changed |= (anf->getNumSimpleXors() != initial_simp_xors);
-            changed |= (anf->getNumReplacedVars() != initial_replaced_vars);
-        }
-        numIters++;
-    }
-    if (config.verbosity >= 1) {
-        cout << "c [Tool terminated after " << numIters << " iteration(s) in "
-             << (cpuTime() - loopStartTime) << " seconds.]" << endl;
-    }
-}
-
-void write_anf(ANF* anf)
-{
-    std::ofstream ofs;
-    ofs.open(anf_output.c_str());
-    if (!ofs) {
-        std::cerr
-        << "c Error opening file \"" << anf_output << "\" for writing"
-        << endl;
-        exit(-1);
-    }
-
-    ANF* newanf = NULL;
-    if (renumber_ring_vars) {
-        anf->preferLowVars();
-        vector<uint32_t> oldToNew;
-        vector<uint32_t> newToOld;
-        newanf = anf->minimise(oldToNew, newToOld);
-    } else {
-        newanf = anf;
-    }
-
-    //Write to file
-    ofs << "c Executed arguments: " << executed_args << endl;
-    ofs << *newanf << endl;
-
-    if (renumber_ring_vars) {
-        delete newanf;
-    }
-}
-
-void solve_by_sat(const ANF* anf, const ANF& orig_anf)
-{
-    double myTime = cpuTime();
-
-    CNF cnf(*anf, config);
-    cnf.init();
-    cnf.addAllEquations();
-
-    cout << "c ---- CNF stats -----" << endl;
-    cout << "c CNF conversion time  : " << (cpuTime() - myTime) << endl;
-    cnf.print_stats();
-
-    if (writeCNF) {
-        std::ofstream ofs;
-        ofs.open(cnf_output.c_str());
-        if (!ofs) {
-            cout << "c Error opening file \""
-            << cnf_output
-            << "\" for writing" << endl;
-            exit(-1);
-        }
-        ofs << "c Executed arguments: " << executed_args << endl;
-        for(size_t i = 0; i < anf->getRing().nVariables(); i++) {
-            //BooleVariable v(i, anf->getRing());
-            Lit l = anf->getReplaced(i);
-            BooleVariable v(l.var(), anf->getRing());
-            ofs << "c MAP " << i << " = " << cnf.getVarForMonom(v) << endl;
-        }
-        ofs << cnf << endl;
-        ofs.close();
-    }
-
-    if (doSolveSAT) {
-        SATSolve solver(config.verbosity, programName);
-        vector<lbool> sol = solver.solveCNF(orig_anf, *anf, cnf);
-
-        if (config.verbosity >= 1) {
-            cout << "c CPU time unknown " << endl;
-        }
-
-        if (!sol.empty()) {
-            for(const string str :extractString) {
-                std::pair<uint32_t, uint32_t> range = get_var_range(str, orig_anf.getRing().nVariables());
-                anf->extractVariables(range.first, range.second, &sol);
-            }
-        }
-    }
-}
-
-ANF* from_anf(const string anf_filename) {
-    double parseStartTime = cpuTime();
-    const size_t ring_size = get_ringsize(anf_filename);
-    BoolePolyRing* ring = new BoolePolyRing(ring_size + 1);
-    ANF* anf = new ANF(ring, config);
-    anf->readFile(anf_filename, true);
-
-    if (config.verbosity >= 1) {
-        cout << "c Input ANF parsed in "
-             << (cpuTime() - parseStartTime) << " seconds." << endl;
-        anf->printStats(config.verbosity);
-    }
+    anf->readFile(config.anfInput, true);
     return anf;
 }
 
-ANF* from_cnf(const string cnf_filename) {
-    double parseStartTime = cpuTime();
-
-    int maxVar = 0;
+ANF* read_cnf() {
+    // Find out maxVar in input CNF file
+    size_t maxVar = 0;
     std::ifstream ifs;
     std::string temp, x;
-
-    ifs.open(cnf_filename.c_str());
+    ifs.open(config.cnfInput.c_str());
     if (!ifs) {
-        cout << "Problem opening file: " << cnf_filename << " for reading\n";
+        cout << "Problem opening file: " << config.cnfInput << " for reading\n";
         exit(-1);
     }
     while(std::getline(ifs, temp)) {
@@ -620,7 +229,7 @@ ANF* from_cnf(const string cnf_filename) {
             std::istringstream iss(temp);
             while(iss) {
                 iss >> x;
-                maxVar = std::max(maxVar, abs(stoi(x)));
+                maxVar = std::max(maxVar, (size_t) abs(stoi(x)));
             }
         }
     }
@@ -629,6 +238,8 @@ ANF* from_cnf(const string cnf_filename) {
     ifs.clear();
     ifs.seekg(0, ifs.beg);
 
+    // Construct ANF
+    // ring size = maxVar, because CNF variables start from 1
     BoolePolyRing* ring = new BoolePolyRing(maxVar);
     ANF* anf = new ANF(ring, config);
     while(std::getline(ifs, temp)) {
@@ -651,67 +262,328 @@ ANF* from_cnf(const string cnf_filename) {
             anf->addBoolePolynomial(poly);
         }
     }
-
-    if (config.verbosity >= 1) {
-        cout << "c Input CNF parsed in "
-             << (cpuTime() - parseStartTime) << " seconds." << endl;
-        anf->printStats(config.verbosity);
-    }
     return anf;
 }
 
-void perform_all_operations(ANF* anf) {
+CNF* anf_to_cnf(const ANF* anf) {
+    double convStartTime = cpuTime();
+    CNF* cnf = new CNF(*anf, config);
+    cnf->init();
+    cnf->addAllEquations();
+    if (config.verbosity >= 1) {
+        cout << "c CNF conversion time  : " << (cpuTime() - convStartTime) << endl;
+        cnf->printStats();
+    }
+    return cnf;
+}
+
+void write_anf(const ANF* anf) {
+    std::ofstream ofs;
+    ofs.open(config.anfOutput.c_str());
+    if (!ofs) {
+        std::cerr << "c Error opening file \"" << config.anfOutput << "\" for writing\n";
+        exit(-1);
+    } else {
+        ofs << "c Executed arguments: " << config.executedArgs << endl;
+        ofs << *anf << endl;
+    }
+    ofs.close();
+}
+
+void write_cnf(const ANF* anf) {
+    CNF* cnf = anf_to_cnf(anf);
+    std::ofstream ofs;
+    ofs.open(config.cnfOutput.c_str());
+    if (!ofs) {
+        std::cerr << "c Error opening file \"" << config.cnfOutput << "\" for writing\n";
+        exit(-1);
+    } else {
+        ofs << "c Executed arguments: " << config.executedArgs << endl;
+        for(size_t i = 0; i < anf->getRing().nVariables(); i++) {
+            Lit l = anf->getReplaced(i);
+            BooleVariable v(l.var(), anf->getRing());
+            ofs << "c MAP " << i << " = " << cnf->getVarForMonom(v) << endl;
+        }
+        ofs << *cnf << endl;
+    }
+    ofs.close();
+}
+
+// Returns n choose r
+// Note: Assume no overflow
+uint32_t nCr(const uint32_t n, const uint32_t r) {
+    assert(r <= n);
+    uint32_t b = std::min(r, n-r);
+    uint32_t ans = 1;
+    for (uint32_t i = n; i > n-b; --i) {
+        ans *= i;
+    }
+    for (uint32_t i = 1; i <= b; ++i) {
+        ans /= i;
+    }
+    return ans;
+}
+
+void simplify(ANF* anf, const ANF& orig_anf) {
+    double loopStartTime = cpuTime();
+
+    if (config.skipSimplify) {
+        config.doGJSimplify = false;
+        config.doXLSimplify = false;
+        config.doELSimplify = false;
+        config.doSATSimplify = false;
+    }
+    if (!config.custom) {
+        config.doGJSimplify = true;
+        config.doXLSimplify = true;
+        config.doELSimplify = true;
+        config.doSATSimplify = true;
+    }
+    if (config.verbosity >= 1) {
+        cout << "c --- Configuration ---\n"
+             << "c GJ simp: " << config.doGJSimplify << endl
+             << "c XL simp (deg = " << config.xlDeg << "): " << config.doXLSimplify << endl
+             << "c EL simp: " << config.doELSimplify << endl
+             << "c SAT simp (confl limit = " << config.numConfl << "): " << config.doSATSimplify << endl
+             << "c Cut num: " << config.cutNum << endl
+             << "c Karnaugh size: " << config.maxKarnTableSize << endl
+             << "c --------------------\n";
+    }
+
+    // Perform initial propagation to avoid needing >= 2 iterations
+    anf->propagate();
+
+    uint32_t numIters = 0;
+    bool changed = true;
+    while (changed && anf->getOK()) {
+        changed = false;
+
+        // Apply Gauss Jordan simplification
+        if (config.doGJSimplify) {
+            double startTime = cpuTime();
+            int num_learnt = 0;
+            if (!config.nolimiters &&
+                anf->size() * anf->numUniqueMonoms(anf->getEqs()) > 1000000000) {
+                if (config.verbosity >= 3) {
+                    cout << "c Matrix has over 1 billion cells. Skip GJE\n";
+                }
+            } else {
+                GaussJordan gj(anf->getEqs(), anf->getRing(), config.verbosity);
+                vector<BoolePolynomial> truths_from_gj;
+                gj.run(truths_from_gj);
+                for(BoolePolynomial poly : truths_from_gj) {
+                    num_learnt += anf->addLearntBoolePolynomial(poly);
+                }
+            }
+            if (config.verbosity >= 2) {
+                cout << "c [Gauss Jordan] learnt " << num_learnt << " new facts in "
+                     << (cpuTime() - startTime) << " seconds." << endl;
+            }
+            changed |= (num_learnt != 0);
+        }
+
+        // Apply XL simplification (includes Gauss Jordan)
+        if (config.doXLSimplify) {
+            double startTime = cpuTime();
+            int num_learnt = 0;
+            int multiplier = 0;
+            for (uint32_t d = 0; d <= config.xlDeg; ++d) {
+                // Add (n choose d)
+                multiplier += nCr(anf->getRing().nVariables(), d);
+            }
+            if (anf->size() == 0) {
+                if (config.verbosity >= 3) {
+                    cout << "c System is empty. Skip XL\n";
+                }
+            } else if (!config.nolimiters &&
+                       (double) anf->size() * anf->getRing().nVariables() > 1000000000 / multiplier) {
+                if (config.verbosity >= 3) {
+                   cout << "c Matrix has over 1 billion cells. Skip XL\n"
+                        << "c (This is a lower bound estimate assuming no change in numUniqueMonoms)\n";
+                }
+            } else {
+                vector<BoolePolynomial> equations;
+                for (const BoolePolynomial& poly : anf->getEqs()) {
+                    equations.push_back(poly);
+                }
+                // Ugly hack
+                // To do: Efficient implementation of "nVars choose xlDeg"
+                //        e.g. http://howardhinnant.github.io/combinations.html?
+                unsigned long nVars = anf->getRing().nVariables();
+                if (config.xlDeg >= 1) {
+                    for (unsigned long i = 0; i < nVars; ++i) {
+                        BooleVariable v = anf->getRing().variable(i);
+                        for (const BoolePolynomial& poly : anf->getEqs()) {
+                            equations.push_back(BoolePolynomial(v * poly));
+                        }
+                    }
+                }
+                if (config.xlDeg >= 2) {
+                    for (unsigned long i = 0; i < nVars; ++i) {
+                        for (unsigned long j = i+1; j < nVars; ++j) {
+                            BooleVariable v1 = anf->getRing().variable(i);
+                            BooleVariable v2 = anf->getRing().variable(j);
+                            for (const BoolePolynomial& poly : anf->getEqs()) {
+                                equations.push_back(BoolePolynomial(v1 * v2 * poly));
+                            }
+                        }
+                    }
+                }
+                if (config.xlDeg >= 3) {
+                    for (unsigned long i = 0; i < nVars; ++i) {
+                        for (unsigned long j = i+1; j < nVars; ++j) {
+                            for (unsigned long k = j+1; k < nVars; ++k) {
+                                BooleVariable v1 = anf->getRing().variable(i);
+                                BooleVariable v2 = anf->getRing().variable(j);
+                                BooleVariable v3 = anf->getRing().variable(k);
+                                for (const BoolePolynomial& poly : anf->getEqs()) {
+                                    equations.push_back(BoolePolynomial(v1 * v2 * v3 * poly));
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!config.nolimiters &&
+                    (double) equations.size() > 1000000000 / anf->numUniqueMonoms(equations)) {
+                    if (config.verbosity >= 3) {
+                        cout << "c Matrix has over 1 billion cells. Skip XL\n";
+                    }
+                } else {
+                    GaussJordan gj(equations, anf->getRing(), config.verbosity);
+                    vector<BoolePolynomial> truths_from_gj;
+                    gj.run(truths_from_gj);
+                    for(BoolePolynomial poly : truths_from_gj) {
+                        num_learnt += anf->addLearntBoolePolynomial(poly);
+                    }
+                }
+            }
+            if (config.verbosity >= 2) {
+                cout << "c [XL] learnt " << num_learnt << " new facts in "
+                     << (cpuTime() - startTime) << " seconds." << endl;
+            }
+            changed |= (num_learnt != 0);
+        }
+
+        // Apply ElimLin simplification (includes Gauss Jordan)
+        if (config.doELSimplify) {
+            double startTime = cpuTime();
+            int num_learnt = anf->elimLin();
+            if (config.verbosity >= 2) {
+                cout << "c [ElimLin] learnt " << num_learnt << " new facts in "
+                     << (cpuTime() - startTime) << " seconds." << endl;
+            }
+            changed |= (num_learnt != 0);
+        }
+
+        // Apply SAT simplification (run CMS, then extract learnt clauses)
+        if (config.doSATSimplify) {
+            double startTime = cpuTime();
+            SimplifyBySat simpsat(*anf, orig_anf, config);
+            int num_learnt = simpsat.simplify();
+            if (config.verbosity >= 2) {
+                cout << "c [Cryptominisat] learnt " << num_learnt << " new facts in "
+                     << (cpuTime() - startTime) << " seconds." << endl;
+            }
+            changed |= (num_learnt != 0);
+        }
+
+        uint64_t initial_set_vars = anf->getNumSetVars();
+        uint64_t initial_eq_num = anf->size();
+        uint64_t initial_monom_in_eq = anf->numMonoms();
+        uint64_t initial_deg = anf->deg();
+        uint64_t initial_simp_xors = anf->getNumSimpleXors();
+        uint64_t initial_replaced_vars = anf->getNumReplacedVars();
+        anf->propagate();
+        changed |= (anf->getNumSetVars() != initial_set_vars);
+        changed |= (anf->size() != initial_eq_num);
+        changed |= (anf->numMonoms() != initial_monom_in_eq);
+        changed |= (anf->deg() != initial_deg);
+        changed |= (anf->getNumSimpleXors() != initial_simp_xors);
+        changed |= (anf->getNumReplacedVars() != initial_replaced_vars);
+        numIters++;
+    }
+    if (config.verbosity >= 2) {
+        cout << "c [Loop terminated after " << numIters << " iteration(s) in "
+             << (cpuTime() - loopStartTime) << " seconds.]" << endl;
+    }
+}
+
+void solve_by_sat(const ANF* anf, const ANF& orig_anf) {
+    CNF* cnf = anf_to_cnf(anf);
+    SATSolve solver(config.verbosity, config.solverExe);
+    vector<lbool> sol = solver.solveCNF(orig_anf, *anf, *cnf);
+    std::ofstream ofs;
+    ofs.open(config.solutionOutput.c_str());
+    if (!ofs) {
+        std::cerr << "c Error opening file \"" << config.solutionOutput << "\" for writing\n";
+        exit(-1);
+    } else {
+        size_t num = 0;
+        ofs << "v ";
+        for (const lbool lit : sol) {
+            if (lit != l_Undef) {
+                ofs << ((lit == l_True) ? "" : "-") << num << " ";
+            }
+            num++;
+        }
+        ofs << endl;
+    }
+    ofs.close();
+}
+
+int main(int argc, char *argv[]) {
+    parseOptions(argc, argv);
+    if (config.anfInput.length() == 0 && config.cnfInput.length() == 0) {
+        cerr << "c ERROR: you must provide an ANF/CNF input file" << endl;
+    }
+
+    // Read from file
+    ANF* anf;
+    double parseStartTime = cpuTime();
+    if (config.readANF) {
+        anf = read_anf();
+        if (config.verbosity >= 1) {
+            cout << "c ANF Input parsed in "
+                 << (cpuTime() - parseStartTime) << " seconds.\n";
+        }
+    }
+    if (config.readCNF) {
+        anf = read_cnf();
+        if (config.verbosity >= 1) {
+            cout << "c CNF Input parsed in "
+                 << (cpuTime() - parseStartTime) << " seconds.\n";
+        }
+    }
+    if (config.verbosity >= 1) {
+        anf->printStats();
+    }
+
     // Perform simplifications
     ANF orig_anf(*anf);
     simplify(anf, orig_anf);
-    if (printSimpANF) {
+    if (config.printProcessedANF) {
         cout << *anf << endl;
     }
+    if (config.verbosity >= 1) {
+        anf->printStats();
+    }
 
-    // Write simplified ANF
-    if (writeANF) {
+    // Write to file
+    if (config.writeANF) {
         write_anf(anf);
     }
-
-    //We need to extract data
-    if (!extractString.empty()) {
-        if (!anf->getOK()) {
-            //If UNSAT, there is no solution to extract
-            cout << "c UNSAT, so no solution to extract" << endl;
-        } else {
-            //Go through each piece of data that needs extraction
-            for(const string str: extractString) {
-                std::pair<uint32_t, uint32_t> range = get_var_range(str, orig_anf.getRing().nVariables());
-                anf->extractVariables(range.first, range.second);
-            }
-        }
+    if (config.writeCNF) {
+        write_cnf(anf);
     }
 
-    //CNF conversion and solving
-    if (doSolveSAT || writeCNF) {
+    // Solve processed CNF
+    if (config.doSolveSAT) {
         solve_by_sat(anf, orig_anf);
     }
 
     if (config.verbosity >= 1) {
-        anf->printStats(config.verbosity);
+        cout << "c Indra completed in "
+             << (cpuTime() - parseStartTime) << " seconds.\n";
     }
-}
-
-int main(int argc, char *argv[])
-{
-    parseOptions(argc, argv);
-    if (anf_input.length() == 0 && cnf_input.length() == 0) {
-        cerr << "c ERROR: you must provide an ANF/CNF input file" << endl;
-    }
-
-    ANF* anf;
-    if (anf_input.length() != 0) {
-        anf = from_anf(anf_input);
-    } else {
-        anf = from_cnf(cnf_input);
-    }
-    perform_all_operations(anf);
-    cout << endl;
-
     return 0;
 }

@@ -1,6 +1,6 @@
 /*****************************************************************************
-anfconv
 Copyright (C) 2016  Security Research Labs
+Copyright (C) 2018  Mate Soos, Davin Choo
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9,37 +9,32 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ***********************************************/
 
-#include "satsolve.h"
 #include <sstream>
+
 #include "errno.h"
+#include "satsolve.h"
 #include "string.h"
 
 using std::cout;
 using std::endl;
 
-//#define DEBUG_EXTRACTION
-
 SATSolve::SATSolve(const int _verbosity, string _solverExecutable) :
-    satisfiable(l_Undef)
-    , solverExecutable(_solverExecutable)
-    , verbosity(_verbosity)
-{
+    satisfiable(l_Undef), solverExecutable(_solverExecutable), verbosity(_verbosity) {
 }
 
-void SATSolve::createChildProcess()
-{
+void SATSolve::createChildProcess() {
     pid = fork();
 
     if (pid == -1) {
@@ -72,15 +67,12 @@ void SATSolve::createChildProcess()
         execl(solverExecutable.c_str(), solverExecutable.c_str(), (char *)NULL);
 
         //If we couldn't overwrite it, it means there is a failure
-        cout << "ERROR! Could not execute '"
-        << solverExecutable << "'" << endl;
-
+        cout << "ERROR! Could not execute '" << solverExecutable << "'" << endl;
         exit(-1);
     }
 }
 
-string SATSolve::readchild()
-{
+string SATSolve::readchild() {
     // Read back any output
     string str;
     char buf[255];
@@ -93,18 +85,18 @@ string SATSolve::readchild()
     return str;
 }
 
-vector<lbool> SATSolve::solveCNF(const ANF& orig_anf, const ANF& anf, const CNF& cnf)
-{
+vector<lbool> SATSolve::solveCNF(const ANF& orig_anf, const ANF& anf, const CNF& cnf) {
     /* In a pipe, xx[0] is for reading, xx[1] is for writing */
     if (pipe(in) < 0) error("pipe in");
     if (pipe(out) < 0) error("pipe out");
 
     createChildProcess();
 
-    cout
-    << "c Spawned '" << solverExecutable
-    << "' as a child process at pid "<<  pid
-    << endl;
+    if (verbosity >= 4) {
+        cout << "c Spawned '" << solverExecutable
+             << "' as a child process at pid " <<  pid
+             << endl;
+    }
 
     /* This is the parent process */
     /* Close the pipe ends that the child uses to read from / write to so
@@ -198,9 +190,6 @@ vector<lbool> SATSolve::solveCNF(const ANF& orig_anf, const ANF& anf, const CNF&
         ; it != end
         ; it++
     ) {
-        #ifdef DEBUG_EXTRACTION
-        cout << "solution line:" << *it << endl;
-        #endif
         const string& str = *it;
         assert(str[0] == 'v');
         size_t pos = 1;
@@ -243,25 +232,13 @@ vector<lbool> SATSolve::solveCNF(const ANF& orig_anf, const ANF& anf, const CNF&
         }
     }
 
-    #ifdef DEBUG_EXTRACTION
-    cout << "Extracted solution:" << endl;
-    for(map<uint32_t, lbool>::const_iterator
-        it = solution.begin(), end = solution.end()
-        ; it != end
-        ; it++
-    ) {
-        cout << "Sol[" << it->first << "]=" << it->second << endl;
-    }
-    cnf.printMonomMap();
-    #endif
-
     //Map solution from SAT solver to ANF values
     vector<lbool> solution2 = cnf.mapSolToOrig(solutionFromSolver);
 
     //Extend the solution to full ANF
     solution = anf.extendSolution(solution2);
 
-    if (verbosity >= 3) {
+    if (verbosity >= 5) {
         printSolution(solution);
     }
 
@@ -270,8 +247,7 @@ vector<lbool> SATSolve::solveCNF(const ANF& orig_anf, const ANF& anf, const CNF&
     return solution;
 }
 
-void SATSolve::error(const char *s)
-{
+void SATSolve::error(const char *s) {
   perror(s);
   exit(1);
 }
