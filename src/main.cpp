@@ -541,6 +541,7 @@ int main(int argc, char *argv[]) {
                  << (cpuTime() - parseStartTime) << " seconds.\n";
         }
     }
+    assert(anf != NULL);
     if (config.verbosity >= 1) {
         anf->printStats();
     }
