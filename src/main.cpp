@@ -72,12 +72,10 @@ void parseOptions(int argc, char *argv[]) {
     ("karn", po::value(&config.maxKarnTableSize)->default_value(8),
         "Sets Karnaugh map dimension during CNF conversion")
     // Processes
-    ("nosimp", po::bool_switch(&config.skipSimplify)->default_value(false),
-        "Disable application of simplifications. Just do filetype conversion.")
     ("nolimiters", po::bool_switch(&config.nolimiters)->default_value(false),
         "Disable limiters on simplification processes.")
-    ("custom", po::bool_switch(&config.custom)->default_value(false),
-        "Disables running all simplification processes. Manually switch on each of them.")
+    ("nodefault", po::bool_switch(&config.nodefault)->default_value(false),
+        "Disables default setting. You now have to manually switch on simplification processes.")
     ("gjsimp", po::bool_switch(&config.doGJSimplify)->default_value(false),
         "Simplify using GaussJordan")
     ("xlsimp", po::bool_switch(&config.doXLSimplify)->default_value(false),
@@ -176,10 +174,6 @@ void parseOptions(int argc, char *argv[]) {
     }
 
     // Config checks
-    if (config.skipSimplify && config.custom) {
-        cout << "ERROR! You cannot skip all and add custom simplifications simultaneously\n";
-        exit(-1);
-    }
     if (config.cutNum < 3 || config.cutNum > 10) {
         cout << "ERROR! For sanity, cutting number must be between 3 and 10\n";
         exit(-1);
@@ -326,14 +320,7 @@ uint32_t nCr(const uint32_t n, const uint32_t r) {
 
 void simplify(ANF* anf, const ANF& orig_anf) {
     double loopStartTime = cpuTime();
-
-    if (config.skipSimplify) {
-        config.doGJSimplify = false;
-        config.doXLSimplify = false;
-        config.doELSimplify = false;
-        config.doSATSimplify = false;
-    }
-    if (!config.custom) {
+    if (!config.nodefault) {
         config.doGJSimplify = true;
         config.doXLSimplify = true;
         config.doELSimplify = true;

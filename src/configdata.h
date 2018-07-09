@@ -47,9 +47,8 @@ struct ConfigData {
     uint32_t maxKarnTableSize;
 
     // Processes
-    bool skipSimplify;
     bool nolimiters;
-    bool custom;
+    bool nodefault;
     bool doGJSimplify;
     bool doXLSimplify;
     bool doELSimplify;
