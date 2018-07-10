@@ -6,6 +6,11 @@ Historic note: Indra is originally, an ANF simplification tool forked from https
 
 # Installation
 
+### One-shot deployment
+- Use `m4ri-20140914.tar.gz` and `polybori-0.8.3.tar.gz` that we have downloaded before-hand and uploaded into this repository
+- Use the bash script `setup.sh` which runs all commands below in sequential order (Includes `sudo` commands)
+- [**Strongly recommended**] Take a look at `setup.sh` and modify accordingly before executing
+
 ### m4ri
 From https://bitbucket.org/malb/m4ri/downloads/, download `m4ri-20140914.tar.gz`
 
