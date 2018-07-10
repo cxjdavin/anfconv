@@ -53,12 +53,13 @@ make -j4
 ```
 Use `cmake -DSTATICCOMPILE=ON ..` instead if you wish to compile statically. You may now run using the executable `indra` in the `build` directory.
 
-### For testing: [LLVM lit](https://github.com/llvm-mirror/llvm/tree/master/utils/lit) and [stp OutputCheck](https://github.com/stp/OutputCheck)
+### Testing
+Must have [LLVM lit](https://github.com/llvm-mirror/llvm/tree/master/utils/lit) and [stp OutputCheck](https://github.com/stp/OutputCheck). Please install with:
 ```
 pip install lit
 pip install OutputCheck
 ```
-Run test suite via `lit <directory>/indra/tests`
+Run test suite via `lit indra/tests`
 
 # Usage
 
