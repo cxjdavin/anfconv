@@ -116,3 +116,6 @@ More detailed simplification information (e.g. Prints matrix sizes)
 Even more detailed simplification information (e.g. Prints matrix before and after Gauss Jordan Elimination)
 ###### Level 5
 Warning! Data dump from this point onwards
+
+# Known issues
+- PolyBoRi segfaults when we try to construct a ring of size > 1048574. As such, do not run `indra` on instances with too many variables. Anything instance with less than 1048574 variables is okay. Note: 2^20 = 1048576.
