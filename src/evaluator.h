@@ -59,7 +59,6 @@ inline lbool evaluatePoly(const BoolePolynomial& poly, const vector<lbool>& sol)
         BoolePolynomial thisSubPoly(true, poly.ring());
         for(const uint32_t v : mono) {
             assert((uint32_t) sol.size() > v);
-            assert(v >= 0);
             if (sol[v] == l_Undef) {
                 thisSubPoly *= BooleVariable(v, poly.ring());
                 continue;
