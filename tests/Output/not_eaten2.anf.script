@@ -1,1 +1,0 @@
-set -o pipefail;{ ../build/indra --anfread /Users/sozos/Dropbox/github/repositories/indra/tests/not_eaten2.anf --nodefault --printfinal | /usr/local/bin/OutputCheck --comment='c' /Users/sozos/Dropbox/github/repositories/indra/tests/not_eaten2.anf.out; }
