@@ -53,12 +53,13 @@ make -j4
 ```
 Use `cmake -DSTATICCOMPILE=ON ..` instead if you wish to compile statically. You may now run using the executable `indra` in the `build` directory.
 
-### For testing: [LLVM lit](https://github.com/llvm-mirror/llvm/tree/master/utils/lit) and [stp OutputCheck](https://github.com/stp/OutputCheck)
+### Testing
+Must have [LLVM lit](https://github.com/llvm-mirror/llvm/tree/master/utils/lit) and [stp OutputCheck](https://github.com/stp/OutputCheck). Please install with:
 ```
 pip install lit
 pip install OutputCheck
 ```
-Run test suite via `lit <directory>/indra/tests`
+Run test suite via `lit indra/tests`
 
 # Usage
 
@@ -118,4 +119,4 @@ Even more detailed simplification information (e.g. Prints matrix before and aft
 Warning! Data dump from this point onwards
 
 # Known issues
-- PolyBoRi segfaults when we try to construct a ring of size > 1048574. As such, do not run `indra` on instances with too many variables. Anything instance with less than 1048574 variables is okay. Note: 2^20 = 1048576.
+- PolyBoRi cannot handle ring of sizes over approx 1 million (1048574). Do not run `indra` on instances with over a million variables.
