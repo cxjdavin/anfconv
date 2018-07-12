@@ -296,7 +296,11 @@ void write_cnf(const ANF* anf) {
         for(size_t i = 0; i < anf->getRing().nVariables(); i++) {
             Lit l = anf->getReplaced(i);
             BooleVariable v(l.var(), anf->getRing());
-            ofs << "c MAP " << i << " = " << cnf->getVarForMonom(v) << endl;
+            if (l.sign()) {
+                ofs << "c MAP " << i << " = -" << cnf->getVarForMonom(v) << endl;
+            } else {
+                ofs << "c MAP " << i << " = " << cnf->getVarForMonom(v) << endl;
+            }
         }
         ofs << *cnf << endl;
     }
@@ -327,7 +331,7 @@ void simplify(ANF* anf, const ANF& orig_anf) {
         config.doSATSimplify = true;
     }
     if (config.verbosity >= 1) {
-        cout << "c --- Configuration ---\n"
+        cout << "c --- Configuration --\n"
              << "c GJ simp: " << config.doGJSimplify << endl
              << "c XL simp (deg = " << config.xlDeg << "): " << config.doXLSimplify << endl
              << "c EL simp: " << config.doELSimplify << endl
