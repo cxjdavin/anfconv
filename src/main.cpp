@@ -88,6 +88,8 @@ void parseOptions(int argc, char *argv[]) {
         "Simplify using SAT")
     ("confl", po::value<uint64_t>(&config.numConfl)->default_value(100000),
         "Conflict limit for built-in SAT solver. Default = 100000")
+    ("onlysat", po::value<uint64_t>(&config.onlySatCutoff)->default_value(2),
+        "Quits loop if no other simplifications learnt something new X times. Default = 2.")
     // Solve processed CNF
     ("solvesat,s", po::bool_switch(&config.doSolveSAT), "Solve with SAT solver")
     ("solverexe,e", po::value(&config.solverExe)->default_value("/usr/local/bin/cryptominisat"),
@@ -346,7 +348,8 @@ void simplify(ANF* anf, const ANF& orig_anf) {
 
     uint32_t numIters = 0;
     bool changed = true;
-    while (changed && anf->getOK()) {
+    uint64_t onlySat = 0;
+    while (changed && anf->getOK() && onlySat < config.onlySatCutoff) {
         changed = false;
 
         // Apply Gauss Jordan simplification
@@ -474,6 +477,14 @@ void simplify(ANF* anf, const ANF& orig_anf) {
             if (config.verbosity >= 2) {
                 cout << "c [Cryptominisat] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
+            }
+            if (changed) {
+                onlySat = 0;
+            } else if (!config.nolimiters && num_learnt != 0) {
+                onlySat++;
+                if (onlySat >= config.onlySatCutoff) {
+                    cout << "c Terminating because only SAT simplification has been learning.\n";
+                }
             }
             changed |= (num_learnt != 0);
         }

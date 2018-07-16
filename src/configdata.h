@@ -55,6 +55,7 @@ struct ConfigData {
     bool doSATSimplify;
     uint32_t xlDeg;
     uint64_t numConfl;
+    uint64_t onlySatCutoff;
 
     // Solve processed CNF
     bool doSolveSAT;
