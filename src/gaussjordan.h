@@ -137,9 +137,9 @@ class GaussJordan {
                 }
             }
 
-            // Sort in ascending degree-lex order
+            // Sort in descending degree-lex order
             std::sort(all_mono.begin(), all_mono.end(),
-                [](const BooleMonomial& lhs, const BooleMonomial& rhs) {
+                [](const BooleMonomial& rhs, const BooleMonomial& lhs) {
                     if (lhs.deg() == rhs.deg()) {
                       vector<uint32_t> lhs_v, rhs_v;
                       for (uint32_t v : lhs) {
