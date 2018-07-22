@@ -606,9 +606,7 @@ int ANF::elimLin() {
         // 2) abc...z + 1 = 0
         // 3) mono1 + mono2 = 0/1
         size_t realTermsSize = poly.length() - (int) poly.hasConstantPart();
-        if (poly.deg() == 1
-        || (realTermsSize == 1 && poly.hasConstantPart())
-        || realTermsSize == 2) {
+        if (poly.deg() == 1 || (realTermsSize == 1 && poly.hasConstantPart())) {
             learnt_equations.push_back(poly);
         }
     }

@@ -245,11 +245,6 @@ class GaussJordan {
                         if (ones.size() == 1 && poly.hasConstantPart()) {
                             learnt_equations->push_back(poly);
                         }
-
-                        // Binary equation
-                        if (ones.size() == 2) {
-                            learnt_equations->push_back(poly);
-                        }
                     }
                 }
                 if (all_equations != NULL) {
