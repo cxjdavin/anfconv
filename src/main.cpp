@@ -351,6 +351,12 @@ void simplify(ANF* anf, const ANF& orig_anf) {
     uint64_t onlySat = 0;
     while (changed && anf->getOK() && onlySat < config.onlySatCutoff) {
         changed = false;
+        uint64_t initial_set_vars = anf->getNumSetVars();
+        uint64_t initial_eq_num = anf->size();
+        uint64_t initial_monom_in_eq = anf->numMonoms();
+        uint64_t initial_deg = anf->deg();
+        uint64_t initial_simp_xors = anf->getNumSimpleXors();
+        uint64_t initial_replaced_vars = anf->getNumReplacedVars();
 
         // Apply Gauss Jordan simplification
         if (config.doGJSimplify) {
@@ -373,7 +379,10 @@ void simplify(ANF* anf, const ANF& orig_anf) {
                 cout << "c [Gauss Jordan] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
             }
-            changed |= (num_learnt != 0);
+            if (num_learnt != 0) {
+                changed = true;
+                anf->propagate();
+            }
         }
 
         // Apply XL simplification (includes Gauss Jordan)
@@ -455,7 +464,10 @@ void simplify(ANF* anf, const ANF& orig_anf) {
                 cout << "c [XL] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
             }
-            changed |= (num_learnt != 0);
+            if (num_learnt != 0) {
+                changed = true;
+                anf->propagate();
+            }
         }
 
         // Apply ElimLin simplification (includes Gauss Jordan)
@@ -466,7 +478,10 @@ void simplify(ANF* anf, const ANF& orig_anf) {
                 cout << "c [ElimLin] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
             }
-            changed |= (num_learnt != 0);
+            if (num_learnt != 0) {
+                changed = true;
+                anf->propagate();
+            }
         }
 
         // Apply SAT simplification (run CMS, then extract learnt clauses)
@@ -486,16 +501,12 @@ void simplify(ANF* anf, const ANF& orig_anf) {
                     cout << "c Terminating because only SAT simplification has been learning.\n";
                 }
             }
-            changed |= (num_learnt != 0);
+            if (num_learnt != 0) {
+                changed = true;
+                anf->propagate();
+            }
         }
 
-        uint64_t initial_set_vars = anf->getNumSetVars();
-        uint64_t initial_eq_num = anf->size();
-        uint64_t initial_monom_in_eq = anf->numMonoms();
-        uint64_t initial_deg = anf->deg();
-        uint64_t initial_simp_xors = anf->getNumSimpleXors();
-        uint64_t initial_replaced_vars = anf->getNumReplacedVars();
-        anf->propagate();
         changed |= (anf->getNumSetVars() != initial_set_vars);
         changed |= (anf->size() != initial_eq_num);
         changed |= (anf->numMonoms() != initial_monom_in_eq);
