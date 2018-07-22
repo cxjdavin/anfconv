@@ -518,9 +518,9 @@ int ANF::elimLin() {
     while (!fixedpoint) {
         fixedpoint = true;
         if (!config.nolimiters &&
-            all_equations.size() * numUniqueMonoms(all_equations) > 1000000000) {
+            all_equations.size() * numUniqueMonoms(all_equations) > 1000000) {
             if (config.verbosity >= 3) {
-                cout << "c Matrix has over 1 billion cells. Break out of EL loop\n";
+                cout << "c Matrix has over 1 million cells. Break out of EL loop\n";
             }
             break;
         }
