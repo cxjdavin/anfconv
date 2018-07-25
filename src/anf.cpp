@@ -530,7 +530,7 @@ int ANF::elimLin() {
         gj.run(linear_indices, all_equations);
 
         if (config.verbosity >= 3) {
-            cout << "c Processing " << linear_indices.size() << " linear equations"
+            cout << "c Processing " << linear_indices.size() << " linear equations "
                  << "in a system with " << all_equations.size() << " equations\n";
         }
 
