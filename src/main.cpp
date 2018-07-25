@@ -363,9 +363,9 @@ void simplify(ANF* anf, const ANF& orig_anf) {
             double startTime = cpuTime();
             int num_learnt = 0;
             if (!config.nolimiters &&
-                anf->size() * anf->numUniqueMonoms(anf->getEqs()) > 1000000) {
+                anf->size() * anf->numUniqueMonoms(anf->getEqs()) > 10000000) {
                 if (config.verbosity >= 3) {
-                    cout << "c Matrix has over 1 million cells. Skip GJE\n";
+                    cout << "c Matrix has over 10 million cells. Skip GJE\n";
                 }
             } else {
                 GaussJordan gj(anf->getEqs(), anf->getRing(), config.verbosity);
@@ -399,9 +399,9 @@ void simplify(ANF* anf, const ANF& orig_anf) {
                     cout << "c System is empty. Skip XL\n";
                 }
             } else if (!config.nolimiters &&
-                       (double) anf->size() * anf->getRing().nVariables() > 1000000 / multiplier) {
+                       (double) anf->size() * anf->getRing().nVariables() > 10000000 / multiplier) {
                 if (config.verbosity >= 3) {
-                   cout << "c Matrix has over 1 million cells. Skip XL\n"
+                   cout << "c Matrix has over 10 million cells. Skip XL\n"
                         << "c (This is a lower bound estimate assuming no change in numUniqueMonoms)\n";
                 }
             } else {
@@ -447,9 +447,9 @@ void simplify(ANF* anf, const ANF& orig_anf) {
                     }
                 }
                 if (!config.nolimiters &&
-                    (double) equations.size() > 1000000 / anf->numUniqueMonoms(equations)) {
+                    (double) equations.size() > 10000000 / anf->numUniqueMonoms(equations)) {
                     if (config.verbosity >= 3) {
-                        cout << "c Matrix has over 1 million cells. Skip XL\n";
+                        cout << "c Matrix has over 10 million cells. Skip XL\n";
                     }
                 } else {
                     GaussJordan gj(equations, anf->getRing(), config.verbosity);
