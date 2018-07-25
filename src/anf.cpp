@@ -545,13 +545,17 @@ int ANF::elimLin() {
                 BooleMonomial from_mono(*ring);
                 BoolePolynomial poly_to_replace(0, *ring);
                 size_t best_metric = std::numeric_limits<std::size_t>::max();
+                assert(linear_eq.deg() == 1);
                 for (const BooleMonomial& mono : linear_eq) {
-                    const BoolePolynomial poly = linear_eq - mono;
-                    size_t metric = evaluateMonoReplacement(mono, poly, false);
-                    if (metric < best_metric) {
-                        best_metric = metric;
-                        from_mono = mono;
-                        poly_to_replace = poly;
+                    if (mono != BooleConstant(1)) {
+                        const BoolePolynomial poly = linear_eq - mono;
+                        uint32_t v = mono.firstVariable().index();
+                        size_t metric = occur[v].size();
+                        if (metric < best_metric) {
+                            best_metric = metric;
+                            from_mono = mono;
+                            poly_to_replace = poly;
+                        }
                     }
                 }
                 assert(from_mono.deg() == 1);
