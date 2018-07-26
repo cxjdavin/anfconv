@@ -66,13 +66,15 @@ class ANF {
                                        const BoolePolynomial& to_poly,
                                        bool include_equation);
         void propagate();
-        int elimLin();
+        int extendedLinearization(vector<BoolePolynomial>& truths);
+        int elimLin(vector<BoolePolynomial>& truths);
         vector<lbool> extendSolution(const vector<lbool>& solution) const;
         void printStats() const;
 
         // Returns true if polynomial is new and has been added
         bool addBoolePolynomial(const BoolePolynomial& poly);
         bool addLearntBoolePolynomial(const BoolePolynomial& poly);
+        vector<BoolePolynomial>* contextualizedLearnt(const vector<BoolePolynomial>& learnt);
 
         // Query functions
         size_t size() const;

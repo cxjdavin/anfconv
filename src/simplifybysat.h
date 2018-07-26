@@ -37,7 +37,7 @@ class SimplifyBySat
         SimplifyBySat(ANF& anf, const ANF& orig_anf, ConfigData& _config);
         ~SimplifyBySat();
 
-        int simplify();
+        int simplify(vector<BoolePolynomial>& loop_learnt);
 
     private:
         ANF& anf;
@@ -47,11 +47,11 @@ class SimplifyBySat
         CMSat::SATSolver* solver;
 
         void addClausesToSolver();
-        int extractUnitaries();
-        int extractBinaries();
-        int extractLinear();
-        bool addPolynomial(const pair<vector<uint32_t>, bool>& cnf_poly);
-        int process(const vector< pair<vector<uint32_t>, bool> >& extracted);
+        int extractUnitaries(vector<BoolePolynomial>& loop_learnt);
+        int extractBinaries(vector<BoolePolynomial>& loop_learnt);
+        int extractLinear(vector<BoolePolynomial>& loop_learnt);
+        bool addPolynomial(vector<BoolePolynomial>& loop_learnt, const pair<vector<uint32_t>, bool>& cnf_poly);
+        int process(vector<BoolePolynomial>& loop_learnt, const vector< pair<vector<uint32_t>, bool> >& extracted);
 };
 
 #endif //SIMPLIFYBYSAT_H

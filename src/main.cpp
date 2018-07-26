@@ -304,27 +304,25 @@ void write_cnf(const ANF* anf) {
                 ofs << "c MAP " << i << " = " << cnf->getVarForMonom(v) << endl;
             }
         }
+        if (config.readCNF) {
+            std::ifstream ifs;
+            std::string temp, x;
+            ifs.open(config.cnfInput.c_str());
+            if (!ifs) {
+                cout << "Problem opening file: " << config.cnfInput << " for reading\n";
+                exit(-1);
+            }
+            while(std::getline(ifs, temp)) {
+                ofs << temp << endl;
+            }
+            ofs << "c LEARNT\n";
+        }
         ofs << *cnf << endl;
     }
     ofs.close();
 }
 
-// Returns n choose r
-// Note: Assume no overflow
-uint32_t nCr(const uint32_t n, const uint32_t r) {
-    assert(r <= n);
-    uint32_t b = std::min(r, n-r);
-    uint32_t ans = 1;
-    for (uint32_t i = n; i > n-b; --i) {
-        ans *= i;
-    }
-    for (uint32_t i = 1; i <= b; ++i) {
-        ans /= i;
-    }
-    return ans;
-}
-
-void simplify(ANF* anf, const ANF& orig_anf) {
+vector<BoolePolynomial>* simplify(ANF* anf, const ANF& orig_anf) {
     double loopStartTime = cpuTime();
     if (!config.nodefault) {
         config.doGJSimplify = true;
@@ -346,9 +344,10 @@ void simplify(ANF* anf, const ANF& orig_anf) {
     // Perform initial propagation to avoid needing >= 2 iterations
     anf->propagate();
 
-    uint32_t numIters = 0;
     bool changed = true;
+    uint32_t numIters = 0;
     uint64_t onlySat = 0;
+    vector<BoolePolynomial> loop_learnt;
     while (changed && anf->getOK() && onlySat < config.onlySatCutoff) {
         changed = false;
         uint64_t initial_set_vars = anf->getNumSetVars();
@@ -372,6 +371,7 @@ void simplify(ANF* anf, const ANF& orig_anf) {
                 vector<BoolePolynomial> truths_from_gj;
                 gj.run(truths_from_gj);
                 for(BoolePolynomial poly : truths_from_gj) {
+                    loop_learnt.push_back(poly);
                     num_learnt += anf->addLearntBoolePolynomial(poly);
                 }
             }
@@ -388,78 +388,7 @@ void simplify(ANF* anf, const ANF& orig_anf) {
         // Apply XL simplification (includes Gauss Jordan)
         if (config.doXLSimplify) {
             double startTime = cpuTime();
-            int num_learnt = 0;
-            int multiplier = 0;
-            for (uint32_t d = 0; d <= config.xlDeg; ++d) {
-                // Add (n choose d)
-                multiplier += nCr(anf->getRing().nVariables(), d);
-            }
-            if (anf->size() == 0) {
-                if (config.verbosity >= 3) {
-                    cout << "c System is empty. Skip XL\n";
-                }
-            } else if (!config.nolimiters &&
-                       (double) anf->size() * anf->getRing().nVariables() > 10000000 / multiplier) {
-                if (config.verbosity >= 3) {
-                   cout << "c Matrix has over 10 million cells. Skip XL\n"
-                        << "c (This is a lower bound estimate assuming no change in numUniqueMonoms)\n";
-                }
-            } else {
-                vector<BoolePolynomial> equations;
-                for (const BoolePolynomial& poly : anf->getEqs()) {
-                    equations.push_back(poly);
-                }
-                // Ugly hack
-                // To do: Efficient implementation of "nVars choose xlDeg"
-                //        e.g. http://howardhinnant.github.io/combinations.html?
-                unsigned long nVars = anf->getRing().nVariables();
-                if (config.xlDeg >= 1) {
-                    for (unsigned long i = 0; i < nVars; ++i) {
-                        BooleVariable v = anf->getRing().variable(i);
-                        for (const BoolePolynomial& poly : anf->getEqs()) {
-                            equations.push_back(BoolePolynomial(v * poly));
-                        }
-                    }
-                }
-                if (config.xlDeg >= 2) {
-                    for (unsigned long i = 0; i < nVars; ++i) {
-                        for (unsigned long j = i+1; j < nVars; ++j) {
-                            BooleVariable v1 = anf->getRing().variable(i);
-                            BooleVariable v2 = anf->getRing().variable(j);
-                            for (const BoolePolynomial& poly : anf->getEqs()) {
-                                equations.push_back(BoolePolynomial(v1 * v2 * poly));
-                            }
-                        }
-                    }
-                }
-                if (config.xlDeg >= 3) {
-                    for (unsigned long i = 0; i < nVars; ++i) {
-                        for (unsigned long j = i+1; j < nVars; ++j) {
-                            for (unsigned long k = j+1; k < nVars; ++k) {
-                                BooleVariable v1 = anf->getRing().variable(i);
-                                BooleVariable v2 = anf->getRing().variable(j);
-                                BooleVariable v3 = anf->getRing().variable(k);
-                                for (const BoolePolynomial& poly : anf->getEqs()) {
-                                    equations.push_back(BoolePolynomial(v1 * v2 * v3 * poly));
-                                }
-                            }
-                        }
-                    }
-                }
-                if (!config.nolimiters &&
-                    (double) equations.size() > 10000000 / anf->numUniqueMonoms(equations)) {
-                    if (config.verbosity >= 3) {
-                        cout << "c Matrix has over 10 million cells. Skip XL\n";
-                    }
-                } else {
-                    GaussJordan gj(equations, anf->getRing(), config.verbosity);
-                    vector<BoolePolynomial> truths_from_gj;
-                    gj.run(truths_from_gj);
-                    for(BoolePolynomial poly : truths_from_gj) {
-                        num_learnt += anf->addLearntBoolePolynomial(poly);
-                    }
-                }
-            }
+            int num_learnt = anf->extendedLinearization(loop_learnt);
             if (config.verbosity >= 2) {
                 cout << "c [XL] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
@@ -473,7 +402,7 @@ void simplify(ANF* anf, const ANF& orig_anf) {
         // Apply ElimLin simplification (includes Gauss Jordan)
         if (config.doELSimplify) {
             double startTime = cpuTime();
-            int num_learnt = anf->elimLin();
+            int num_learnt = anf->elimLin(loop_learnt);
             if (config.verbosity >= 2) {
                 cout << "c [ElimLin] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
@@ -488,7 +417,7 @@ void simplify(ANF* anf, const ANF& orig_anf) {
         if (config.doSATSimplify) {
             double startTime = cpuTime();
             SimplifyBySat simpsat(*anf, orig_anf, config);
-            int num_learnt = simpsat.simplify();
+            int num_learnt = simpsat.simplify(loop_learnt);
             if (config.verbosity >= 2) {
                 cout << "c [Cryptominisat] learnt " << num_learnt << " new facts in "
                      << (cpuTime() - startTime) << " seconds." << endl;
@@ -515,10 +444,13 @@ void simplify(ANF* anf, const ANF& orig_anf) {
         changed |= (anf->getNumReplacedVars() != initial_replaced_vars);
         numIters++;
     }
+    vector<BoolePolynomial>* all_learnt = anf->contextualizedLearnt(loop_learnt);
     if (config.verbosity >= 2) {
         cout << "c [Loop terminated after " << numIters << " iteration(s) in "
-             << (cpuTime() - loopStartTime) << " seconds.]" << endl;
+             << (cpuTime() - loopStartTime) << " seconds.]\n"
+             << "c " << all_learnt->size() << " facts were learnt.\n";
     }
+    return all_learnt;
 }
 
 void solve_by_sat(const ANF* anf, const ANF& orig_anf) {
@@ -574,7 +506,7 @@ int main(int argc, char *argv[]) {
 
     // Perform simplifications
     ANF orig_anf(*anf);
-    simplify(anf, orig_anf);
+    vector<BoolePolynomial>* all_learnt = simplify(anf, orig_anf);
     if (config.printProcessedANF) {
         cout << *anf << endl;
     }
@@ -587,7 +519,12 @@ int main(int argc, char *argv[]) {
         write_anf(anf);
     }
     if (config.writeCNF) {
-        write_cnf(anf);
+        //ANF learnt_system(anf->getRing(), config);
+        ANF* learnt_system = new ANF(new BoolePolyRing(anf->getRing().nVariables()), config);
+        for (const BoolePolynomial& poly : *all_learnt) {
+            learnt_system->addBoolePolynomial(poly);
+        }
+        write_cnf(learnt_system);
     }
 
     // Solve processed CNF

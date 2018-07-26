@@ -52,7 +52,7 @@ void SimplifyBySat::addClausesToSolver() {
     }
 }
 
-int SimplifyBySat::extractUnitaries() {
+int SimplifyBySat::extractUnitaries(vector<BoolePolynomial>& loop_learnt) {
     vector<Lit> units = solver->get_zero_assigned_lits();
     if (config.verbosity >= 3) {
         cout << "c Number of unit learnt clauses: " << units.size() << endl;
@@ -79,6 +79,7 @@ int SimplifyBySat::extractUnitaries() {
         BoolePolynomial poly(!unit.sign(), anf.getRing());
         poly += m;
 
+        loop_learnt.push_back(poly);
         numRealVarLearnt += anf.addLearntBoolePolynomial(poly);
     }
 
@@ -88,7 +89,7 @@ int SimplifyBySat::extractUnitaries() {
     return numRealVarLearnt;
 }
 
-int SimplifyBySat::extractBinaries() {
+int SimplifyBySat::extractBinaries(vector<BoolePolynomial>& loop_learnt) {
     vector<pair<Lit, Lit> > binXors = solver->get_all_binary_xors();
     if (config.verbosity >= 3) {
         cout << "c Number of binary clauses:" << binXors.size() << endl;
@@ -119,6 +120,7 @@ int SimplifyBySat::extractBinaries() {
         poly += m1;
         poly += m2;
 
+        loop_learnt.push_back(poly);
         numRealVarReplaced += anf.addLearntBoolePolynomial(poly);
     }
 
@@ -128,7 +130,8 @@ int SimplifyBySat::extractBinaries() {
     return numRealVarReplaced;
 }
 
-bool SimplifyBySat::addPolynomial(const pair<vector<uint32_t>, bool>& cnf_poly) {
+bool SimplifyBySat::addPolynomial(vector<BoolePolynomial>& loop_learnt,
+                                  const pair<vector<uint32_t>,bool>& cnf_poly) {
     BoolePolynomial new_poly(cnf_poly.second, anf.getRing());
     for (const uint32_t& var_idx : cnf_poly.first) {
         if (!cnf.varRepresentsMonomial(var_idx)) {
@@ -138,15 +141,18 @@ bool SimplifyBySat::addPolynomial(const pair<vector<uint32_t>, bool>& cnf_poly) 
     }
 
     if (new_poly.deg() == 1) {
+        loop_learnt.push_back(new_poly);
         return anf.addLearntBoolePolynomial(new_poly);
     }
     return false;
 }
 
-int SimplifyBySat::process(const vector< pair<vector<uint32_t>, bool> >& extracted) {
+int SimplifyBySat::process(vector<BoolePolynomial>& loop_learnt,
+                           const vector< pair<vector<uint32_t>,
+                           bool> >& extracted) {
     int num_new_polys = 0;
     for (const pair<vector<uint32_t>, bool>& cnf_poly : extracted) {
-        bool added = addPolynomial(cnf_poly);
+        bool added = addPolynomial(loop_learnt, cnf_poly);
         if (added) {
             num_new_polys++;
         }
@@ -154,10 +160,10 @@ int SimplifyBySat::process(const vector< pair<vector<uint32_t>, bool> >& extract
     return num_new_polys;
 }
 
-int SimplifyBySat::extractLinear() {
+int SimplifyBySat::extractLinear(vector<BoolePolynomial>& loop_learnt) {
     int num_new_polys = 0;
-    num_new_polys += process(solver->get_recovered_xors(false));
-    num_new_polys += process(solver->get_recovered_xors(true));
+    num_new_polys += process(loop_learnt, solver->get_recovered_xors(false));
+    num_new_polys += process(loop_learnt, solver->get_recovered_xors(true));
 
     if (config.verbosity >= 3) {
         cout << "c Num ANF linear equations learnt: " << num_new_polys << endl;
@@ -165,7 +171,7 @@ int SimplifyBySat::extractLinear() {
     return num_new_polys;
 }
 
-int SimplifyBySat::simplify() {
+int SimplifyBySat::simplify(vector<BoolePolynomial>& loop_learnt) {
     if (!anf.getOK()) {
         cout << "c Nothing to simplify: UNSAT" << endl;
         return -1;
@@ -189,9 +195,9 @@ int SimplifyBySat::simplify() {
 
     //Extract data
     int num_learnt = 0;
-    num_learnt += extractUnitaries();
-    num_learnt += extractBinaries();
-    num_learnt += extractLinear();
+    num_learnt += extractUnitaries(loop_learnt);
+    num_learnt += extractBinaries(loop_learnt);
+    num_learnt += extractLinear(loop_learnt);
 
     if (ret == l_Undef) {
         return num_learnt;

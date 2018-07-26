@@ -279,6 +279,18 @@ bool ANF::addLearntBoolePolynomial(const BoolePolynomial& poly) {
     return added;
 }
 
+// Slow. O(n^2) because cannot use set<> for BoolePolynomial
+vector<BoolePolynomial>* ANF::contextualizedLearnt(const vector<BoolePolynomial>& loop_learnt) {
+    vector<BoolePolynomial>* all_learnt = new vector<BoolePolynomial>();
+    for (const BoolePolynomial& poly : loop_learnt) {
+        BoolePolynomial contextualized_poly = replacer->update(poly);
+        if (std::find(all_learnt->begin(), all_learnt->end(), contextualized_poly) == all_learnt->end()) {
+            all_learnt->push_back(contextualized_poly);
+        }
+    }
+    return all_learnt;
+}
+
 void ANF::addPolyToOccur(const BoolePolynomial& poly, const size_t eq_idx) {
     for (const uint32_t var_idx : poly.usedVariables()) {
         occur[var_idx].push_back(eq_idx);
@@ -502,8 +514,100 @@ size_t ANF::evaluateMonoReplacement(const BooleMonomial& from_mono,
     return metric;
 }
 
+// Returns n choose r
+// Note: Assume no overflow
+uint32_t nCr(const uint32_t n, const uint32_t r) {
+    assert(r <= n);
+    uint32_t b = std::min(r, n-r);
+    uint32_t ans = 1;
+    for (uint32_t i = n; i > n-b; --i) {
+        ans *= i;
+    }
+    for (uint32_t i = 1; i <= b; ++i) {
+        ans /= i;
+    }
+    return ans;
+}
+
+int ANF::extendedLinearization(vector<BoolePolynomial>& loop_learnt) {
+    int num_learnt = 0;
+    int multiplier = 0;
+    for (uint32_t d = 0; d <= config.xlDeg; ++d) {
+        // Add (n choose d)
+        multiplier += nCr(ring->nVariables(), d);
+    }
+    if (eqs.size() == 0) {
+        if (config.verbosity >= 3) {
+            cout << "c System is empty. Skip XL\n";
+        }
+    } else if (!config.nolimiters &&
+               (double) eqs.size() * ring->nVariables() > 10000000 / multiplier) {
+        if (config.verbosity >= 3) {
+           cout << "c Matrix has over 10 million cells. Skip XL\n"
+                << "c (This is a lower bound estimate assuming no change in numUniqueMonoms)\n";
+        }
+    } else {
+        vector<BoolePolynomial> equations;
+        for (const BoolePolynomial& poly : eqs) {
+            equations.push_back(poly);
+        }
+        // Ugly hack
+        // To do: Efficient implementation of "nVars choose xlDeg"
+        //        e.g. http://howardhinnant.github.io/combinations.html?
+        unsigned long nVars = ring->nVariables();
+        if (config.xlDeg >= 1) {
+            for (unsigned long i = 0; i < nVars; ++i) {
+                BooleVariable v = ring->variable(i);
+                for (const BoolePolynomial& poly : eqs) {
+                    equations.push_back(BoolePolynomial(v * poly));
+                }
+            }
+        }
+        if (config.xlDeg >= 2) {
+            for (unsigned long i = 0; i < nVars; ++i) {
+                for (unsigned long j = i+1; j < nVars; ++j) {
+                    BooleVariable v1 = ring->variable(i);
+                    BooleVariable v2 = ring->variable(j);
+                    for (const BoolePolynomial& poly : eqs) {
+                        equations.push_back(BoolePolynomial(v1 * v2 * poly));
+                    }
+                }
+            }
+        }
+        if (config.xlDeg >= 3) {
+            for (unsigned long i = 0; i < nVars; ++i) {
+                for (unsigned long j = i+1; j < nVars; ++j) {
+                    for (unsigned long k = j+1; k < nVars; ++k) {
+                        BooleVariable v1 = ring->variable(i);
+                        BooleVariable v2 = ring->variable(j);
+                        BooleVariable v3 = ring->variable(k);
+                        for (const BoolePolynomial& poly : eqs) {
+                            equations.push_back(BoolePolynomial(v1 * v2 * v3 * poly));
+                        }
+                    }
+                }
+            }
+        }
+        if (!config.nolimiters &&
+            (double) equations.size() > 10000000 / numUniqueMonoms(equations)) {
+            if (config.verbosity >= 3) {
+                cout << "c Matrix has over 10 million cells. Skip XL\n";
+            }
+        } else {
+            GaussJordan gj(equations, *ring, config.verbosity);
+            vector<BoolePolynomial> truths_from_gj;
+            gj.run(truths_from_gj);
+            for(BoolePolynomial poly : truths_from_gj) {
+                loop_learnt.push_back(poly);
+                num_learnt += addLearntBoolePolynomial(poly);
+            }
+        }
+    }
+    return num_learnt;
+}
+
 // Implementation based on https://infoscience.epfl.ch/record/176270/files/ElimLin_full_version.pdf
-int ANF::elimLin() {
+int ANF::elimLin(vector<BoolePolynomial>& loop_learnt) {
     vector<size_t> linear_indices;
     vector<BoolePolynomial> all_equations;
     vector<BoolePolynomial> learnt_equations;
@@ -618,6 +722,7 @@ int ANF::elimLin() {
     // Add learnt_equations
     int linear_count = 0;
     for (const BoolePolynomial& poly : learnt_equations) {
+        loop_learnt.push_back(poly);
         bool added = addLearntBoolePolynomial(poly);
         if (added) {
             num_learnt++;
