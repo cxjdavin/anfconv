@@ -286,7 +286,7 @@ void write_anf(const ANF* anf) {
     ofs.close();
 }
 
-void write_cnf(const ANF* anf) {
+void write_cnf(const ANF* anf, const ANF* learnt) {
     CNF* cnf = anf_to_cnf(anf);
     std::ofstream ofs;
     ofs.open(config.cnfOutput.c_str());
@@ -315,9 +315,12 @@ void write_cnf(const ANF* anf) {
             while(std::getline(ifs, temp)) {
                 ofs << temp << endl;
             }
+            CNF* learnt_cnf = anf_to_cnf(learnt);
             ofs << "c LEARNT\n";
+            ofs << *learnt_cnf;
+        } else {
+            ofs << *cnf << endl;
         }
-        ofs << *cnf << endl;
     }
     ofs.close();
 }
@@ -519,12 +522,11 @@ int main(int argc, char *argv[]) {
         write_anf(anf);
     }
     if (config.writeCNF) {
-        //ANF learnt_system(anf->getRing(), config);
         ANF* learnt_system = new ANF(new BoolePolyRing(anf->getRing().nVariables()), config);
         for (const BoolePolynomial& poly : *all_learnt) {
             learnt_system->addBoolePolynomial(poly);
         }
-        write_cnf(learnt_system);
+        write_cnf(anf, learnt_system);
     }
 
     // Solve processed CNF
