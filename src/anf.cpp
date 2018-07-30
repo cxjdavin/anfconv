@@ -485,36 +485,6 @@ void ANF::checkOccur() const {
     }
 }
 
-size_t ANF::evaluateMonoReplacement(const BooleMonomial& from_mono,
-                                    const BoolePolynomial& to_poly,
-                                    bool include_equation) {
-    // Clone system
-    vector<BoolePolynomial> cloned_system;
-    for (const BoolePolynomial& poly : eqs) {
-        cloned_system.push_back(poly);
-    }
-
-    // Try replace from_mono with to_poly
-    if (include_equation) {
-        cloned_system.push_back(from_mono + to_poly);
-    }
-    for (BoolePolynomial& poly : cloned_system) {
-        BoolePolynomial newpoly(*ring);
-        for (const BooleMonomial& mono : poly) {
-            if (containsMono(mono, from_mono)) {
-                newpoly +=  (mono / from_mono) * to_poly;
-            } else {
-                newpoly += mono;
-            }
-        }
-        poly = newpoly;
-    }
-
-    // Evaluate metric
-    size_t metric = numUniqueMonoms(cloned_system);
-    return metric;
-}
-
 // Returns n choose r
 // Note: Assume no overflow
 uint32_t nCr(const uint32_t n, const uint32_t r) {

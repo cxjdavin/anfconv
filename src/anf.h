@@ -62,9 +62,6 @@ class ANF {
         ~ANF();
 
         size_t readFile(const string& filename, const bool addPoly);
-        size_t evaluateMonoReplacement(const BooleMonomial& from_mono,
-                                       const BoolePolynomial& to_poly,
-                                       bool include_equation);
         void propagate();
         int extendedLinearization(vector<BoolePolynomial>& truths);
         int elimLin(vector<BoolePolynomial>& truths);
