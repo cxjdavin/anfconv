@@ -284,10 +284,7 @@ vector<BoolePolynomial>* ANF::contextualizedLearnt(const vector<BoolePolynomial>
     vector<BoolePolynomial>* all_learnt = new vector<BoolePolynomial>();
     for (const BoolePolynomial& poly : loop_learnt) {
         BoolePolynomial contextualized_poly = replacer->update(poly);
-        if (std::find(all_learnt->begin(), all_learnt->end(), contextualized_poly) == all_learnt->end() &&
-            std::find(eqs.begin(), eqs.end(), contextualized_poly) == eqs.end()) {
-            all_learnt->push_back(contextualized_poly);
-        }
+        all_learnt->push_back(contextualized_poly);
     }
     return all_learnt;
 }
