@@ -316,8 +316,11 @@ void write_cnf(const ANF* anf, const ANF* learnt) {
                 ofs << temp << endl;
             }
             CNF* learnt_cnf = anf_to_cnf(learnt);
-            ofs << "c LEARNT\n";
+            ofs << "c Adding " << learnt->size() << " fact(s) from indra\n";
             ofs << *learnt_cnf;
+            if (config.verbosity >= 1) {
+                cout << "c " << learnt->size() << " fact(s) augmented to CNF.\n";
+            }
         } else {
             ofs << *cnf << endl;
         }
@@ -450,8 +453,7 @@ vector<BoolePolynomial>* simplify(ANF* anf, const ANF& orig_anf) {
     vector<BoolePolynomial>* all_learnt = anf->contextualizedLearnt(loop_learnt);
     if (config.verbosity >= 2) {
         cout << "c [Loop terminated after " << numIters << " iteration(s) in "
-             << (cpuTime() - loopStartTime) << " seconds.]\n"
-             << "c " << all_learnt->size() << " facts were learnt.\n";
+             << (cpuTime() - loopStartTime) << " seconds.]\n";
     }
     return all_learnt;
 }
