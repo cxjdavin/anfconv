@@ -26,6 +26,7 @@ SOFTWARE.
 
 #include "anf.h"
 #include "cnf.h"
+#include <fstream>
 
 namespace CMSat {
     class SATSolver;

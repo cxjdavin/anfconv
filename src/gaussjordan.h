@@ -96,24 +96,78 @@ class GaussJordan {
             cout << endl;
         }
 
-        // For ElimLin
-        void run(vector<size_t>& linear_indices,
-                 vector<BoolePolynomial>& all_equations) {
+        int run(vector<BoolePolynomial>* all_equations,
+                vector<BoolePolynomial>* learnt_equations) {
             double startTime = cpuTime();
-            linear_indices.clear();
-            all_equations.clear();
-            extract_from_matrix(&linear_indices, &all_equations, NULL);
-            if (verbosity >= 3) {
-                cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
+            int num_linear = 0;
+            if (all_equations != NULL) {
+                all_equations->clear();
             }
-        }
 
-        void run(vector<BoolePolynomial>& learnt_equations) {
-            double startTime = cpuTime();
-            extract_from_matrix(NULL, NULL, &learnt_equations);
+            // Matrix includes augmented column
+            assert(mat->ncols > 0);
+
+            // See: https://malb.bitbucket.io/m4ri/echelonform_8h.html
+            if (verbosity >= 4) {
+                cout << "c Before Gauss Jordan\n";
+                printMatrix();
+            }
+            mzd_echelonize_m4ri(mat, true, 0);
+            if (verbosity >= 4) {
+                cout << "c After Gauss Jordan\n";
+                printMatrix();
+            }
+
+            // Process Gauss Jordan output results
+            vector<int> ones;
+            for (int row = 0; row < mat->nrows; row++) {
+                // Read row
+                ones.clear();
+                for (int col = 0; col < mat->ncols-1; col++) {
+                    if (mzd_read_bit(mat, row, col)) {
+                        ones.push_back(col);
+                    }
+                }
+                if (ones.size() == 0) {
+                    if (mzd_read_bit(mat, row, mat->ncols-1) == 1) {
+                        // Row is "0 = 1", UNSAT
+                        if (learnt_equations != NULL) {
+                            learnt_equations->push_back(BoolePolynomial(1, ring));
+                        }
+                        return 0;
+                    } else {
+                        // Row is "0 = 0", skip row
+                        continue;
+                    }
+                }
+
+                // Form polynomial
+                BoolePolynomial poly(mzd_read_bit(mat, row, mat->ncols-1), ring);
+                for (int col : ones) {
+                    poly += revMonomMap.find(col)->second;
+                }
+
+                // Process polynomial
+                if (poly.deg() == 1) {
+                    num_linear++;
+                }
+                if (all_equations != NULL) {
+                    all_equations->push_back(poly);
+                }
+                if (learnt_equations != NULL) {
+                    if (poly.deg() == 1) {
+                        // linear equation
+                        learnt_equations->push_back(poly);
+                    } else if (ones.size() == 1 && poly.hasConstantPart()) {
+                        // a*b*c*...*z + 1 = 0
+                        learnt_equations->push_back(poly);
+                    }
+                }
+            }
             if (verbosity >= 3) {
                 cout << "c Gauss Jordan took " << (cpuTime() - startTime) << " seconds." << endl;
             }
+            return num_linear;
         }
 
     private:
@@ -176,88 +230,6 @@ class GaussJordan {
                 monomMap[mono] = nextVar;
                 revMonomMap.insert(make_pair(nextVar, mono));
                 nextVar++;
-            }
-        }
-
-        void extract_from_matrix(vector<size_t>* linear_indices,
-                                 vector<BoolePolynomial>* all_equations,
-                                 vector<BoolePolynomial>* learnt_equations) {
-            assert(learnt_equations != NULL
-                || (linear_indices != NULL && all_equations != NULL));
-
-            // Matrix includes augmented column
-            assert(mat->ncols > 0);
-
-            // See: https://malb.bitbucket.io/m4ri/echelonform_8h.html
-            if (verbosity >= 4) {
-                cout << "c Before Gauss Jordan\n";
-                printMatrix();
-            }
-            mzd_echelonize_m4ri(mat, true, 0);
-            if (verbosity >= 4) {
-                cout << "c After Gauss Jordan\n";
-                printMatrix();
-            }
-
-            // Process Gauss Jordan output results
-            vector<int> ones;
-            for (int row = 0; row < mat->nrows; row++) {
-                // Read row
-                ones.clear();
-                for (int col = 0; col < mat->ncols-1; col++) {
-                    if (mzd_read_bit(mat, row, col)) {
-                        ones.push_back(col);
-                    }
-                }
-                if (ones.size() == 0) {
-                    if (mzd_read_bit(mat, row, mat->ncols-1) == 1) {
-                        // Row is "0 = 1", UNSAT
-                        if (learnt_equations != NULL) {
-                            learnt_equations->push_back(BoolePolynomial(1, ring));
-                        }
-                        return;
-                    } else {
-                        // Row is "0 = 0", skip row
-                        continue;
-                    }
-                }
-
-                // Form polynomial
-                BoolePolynomial poly(mzd_read_bit(mat, row, mat->ncols-1), ring);
-                for (int col : ones) {
-                    poly += revMonomMap.find(col)->second;
-                }
-
-                // Process polynomial
-                if (poly.deg() == 1) {
-                    // Linear
-                    if (linear_indices != NULL) {
-                        linear_indices->push_back(all_equations->size());
-                    }
-
-                    if (learnt_equations != NULL) {
-                        learnt_equations->push_back(poly);
-                    }
-                } else {
-                    // Non-linear
-                    if (learnt_equations != NULL) {
-                        // a*b*c*...*z + 1 = 0
-                        if (ones.size() == 1 && poly.hasConstantPart()) {
-                            learnt_equations->push_back(poly);
-                        }
-                    }
-                }
-                if (all_equations != NULL) {
-                    all_equations->push_back(poly);
-                }
-            }
-
-            // Extract cached linear equations
-            if (linear_indices != NULL && all_equations != NULL) {
-                for (BoolePolynomial& poly : original_linear_equations) {
-                    linear_indices->push_back(all_equations->size());
-                    all_equations->push_back(poly);
-                }
             }
         }
 };

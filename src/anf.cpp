@@ -272,7 +272,7 @@ bool ANF::addLearntBoolePolynomial(const BoolePolynomial& poly) {
     // Contextualize it to existing knowledge
     BoolePolynomial contextualized_poly = replacer->update(poly);
     bool added = addBoolePolynomial(contextualized_poly);
-    if (added && config.verbosity >= 3) {
+    if (added && config.verbosity >= 4) {
         cout << "c Adding: " << poly << endl
              << "c as: " << contextualized_poly << endl;
     }
@@ -482,93 +482,92 @@ void ANF::checkOccur() const {
     }
 }
 
-// Returns n choose r
-// Note: Assume no overflow
-uint32_t nCr(const uint32_t n, const uint32_t r) {
-    assert(r <= n);
-    uint32_t b = std::min(r, n-r);
-    uint32_t ans = 1;
-    for (uint32_t i = n; i > n-b; --i) {
-        ans *= i;
-    }
-    for (uint32_t i = 1; i <= b; ++i) {
-        ans /= i;
-    }
-    return ans;
-}
-
 int ANF::extendedLinearization(vector<BoolePolynomial>& loop_learnt) {
     int num_learnt = 0;
-    int multiplier = 0;
-    for (uint32_t d = 0; d <= config.xlDeg; ++d) {
-        // Add (n choose d)
-        multiplier += nCr(ring->nVariables(), d);
-    }
     if (eqs.size() == 0) {
         if (config.verbosity >= 3) {
             cout << "c System is empty. Skip XL\n";
         }
-    } else if (!config.nolimiters &&
-               (double) eqs.size() * ring->nVariables() > 10000000 / multiplier) {
-        if (config.verbosity >= 3) {
-           cout << "c Matrix has over 10 million cells. Skip XL\n"
-                << "c (This is a lower bound estimate assuming no change in numUniqueMonoms)\n";
-        }
-    } else {
+    } else if (config.nolimiters || log2(eqs.size()) + log2(numUniqueMonoms(eqs)) <= 30) {
         vector<BoolePolynomial> equations;
+        map<uint32_t, vector<BoolePolynomial> > deg_buckets;
+        unordered_set<uint32_t> unique_poly_degrees;
+        vector<uint32_t> sorted_poly_degrees;
+  
+        // Clone original system while putting them into degree buckets
         for (const BoolePolynomial& poly : eqs) {
             equations.push_back(poly);
+            uint32_t poly_deg = poly.deg();
+            unique_poly_degrees.insert(poly_deg);
+            if (deg_buckets.find(poly_deg) == deg_buckets.end()) {
+                deg_buckets[poly_deg] = vector<BoolePolynomial>();
+            }
+            deg_buckets[poly_deg].push_back(poly);
         }
-        // Ugly hack
-        // To do: Efficient implementation of "nVars choose xlDeg"
-        //        e.g. http://howardhinnant.github.io/combinations.html?
+        sorted_poly_degrees.assign(unique_poly_degrees.begin(), unique_poly_degrees.end());
+        sort(sorted_poly_degrees.begin(), sorted_poly_degrees.end());
+
+        // Expansion step
+        bool done_expansion = false;
         unsigned long nVars = ring->nVariables();
-        if (config.xlDeg >= 1) {
-            for (unsigned long i = 0; i < nVars; ++i) {
-                BooleVariable v = ring->variable(i);
-                for (const BoolePolynomial& poly : eqs) {
-                    equations.push_back(BoolePolynomial(v * poly));
+        for (uint32_t deg = 1; deg <= config.xlDeg && !done_expansion; deg++) {
+            for (uint32_t poly_deg : sorted_poly_degrees) {
+                const vector<BoolePolynomial>& to_expand = deg_buckets[poly_deg];
+                if (config.verbosity >= 3) {
+                    cout << "c There are " << to_expand.size() << " polynomials of degree " << poly_deg << endl;
                 }
-            }
-        }
-        if (config.xlDeg >= 2) {
-            for (unsigned long i = 0; i < nVars; ++i) {
-                for (unsigned long j = i+1; j < nVars; ++j) {
-                    BooleVariable v1 = ring->variable(i);
-                    BooleVariable v2 = ring->variable(j);
-                    for (const BoolePolynomial& poly : eqs) {
-                        equations.push_back(BoolePolynomial(v1 * v2 * poly));
-                    }
-                }
-            }
-        }
-        if (config.xlDeg >= 3) {
-            for (unsigned long i = 0; i < nVars; ++i) {
-                for (unsigned long j = i+1; j < nVars; ++j) {
-                    for (unsigned long k = j+1; k < nVars; ++k) {
-                        BooleVariable v1 = ring->variable(i);
-                        BooleVariable v2 = ring->variable(j);
-                        BooleVariable v3 = ring->variable(k);
-                        for (const BoolePolynomial& poly : eqs) {
-                            equations.push_back(BoolePolynomial(v1 * v2 * v3 * poly));
+                for (const BoolePolynomial& poly : to_expand) {
+                    if (!config.nolimiters && log2(equations.size()) + log2(numUniqueMonoms(equations)) > 30) {
+                        done_expansion = true;
+                        break;
+                    } else {
+                        // Ugly hack
+                        // To do: Efficient implementation of "nVars choose xlDeg"
+                        //        e.g. http://howardhinnant.github.io/combinations.html?
+                        if (deg >= 1) {
+                            for (unsigned long i = 0; i < nVars; ++i) {
+                                BooleVariable v = ring->variable(i);
+                                equations.push_back(BoolePolynomial(v * poly));
+                            }
+                        }
+                        if (deg >= 2) {
+                            for (unsigned long i = 0; i < nVars; ++i) {
+                                for (unsigned long j = i+1; j < nVars; ++j) {
+                                    BooleVariable v1 = ring->variable(i);
+                                    BooleVariable v2 = ring->variable(j);
+                                    equations.push_back(BoolePolynomial(v1 * v2 * poly));
+                                }
+                            }
+                        }
+                        if (deg >= 3) {
+                            for (unsigned long i = 0; i < nVars; ++i) {
+                                for (unsigned long j = i+1; j < nVars; ++j) {
+                                    for (unsigned long k = j+1; k < nVars; ++k) {
+                                        BooleVariable v1 = ring->variable(i);
+                                        BooleVariable v2 = ring->variable(j);
+                                        BooleVariable v3 = ring->variable(k);
+                                        equations.push_back(BoolePolynomial(v1 * v2 * v3 * poly));
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+                if (done_expansion) {
+                    break;
+                }
             }
         }
-        if (!config.nolimiters &&
-            (double) equations.size() > 10000000 / numUniqueMonoms(equations)) {
-            if (config.verbosity >= 3) {
-                cout << "c Matrix has over 10 million cells. Skip XL\n";
-            }
-        } else {
-            GaussJordan gj(equations, *ring, config.verbosity);
-            vector<BoolePolynomial> truths_from_gj;
-            gj.run(truths_from_gj);
-            for(BoolePolynomial poly : truths_from_gj) {
-                loop_learnt.push_back(poly);
-                num_learnt += addLearntBoolePolynomial(poly);
-            }
+        // Run GJE after expansion
+        if (config.verbosity >= 2) {
+            cout << "c XL system is " << equations.size() << " x " << numUniqueMonoms(equations) << endl;
+        }
+        GaussJordan gj(equations, *ring, config.verbosity);
+        vector<BoolePolynomial> learnt_from_gj;
+        gj.run(NULL, &learnt_from_gj);
+        for(BoolePolynomial poly : learnt_from_gj) {
+            loop_learnt.push_back(poly);
+            num_learnt += addLearntBoolePolynomial(poly);
         }
     }
     return num_learnt;
@@ -589,8 +588,7 @@ int ANF::elimLin(vector<BoolePolynomial>& loop_learnt) {
     bool fixedpoint = false;
     while (!fixedpoint) {
         fixedpoint = true;
-        if (!config.nolimiters &&
-            all_equations.size() * numUniqueMonoms(all_equations) > 10000000) {
+        if (!config.nolimiters && log2(eqs.size()) + log2(numUniqueMonoms(eqs)) > 30) {
             if (config.verbosity >= 3) {
                 cout << "c Matrix has over 10 million cells. Break out of EL loop\n";
             }
@@ -599,11 +597,33 @@ int ANF::elimLin(vector<BoolePolynomial>& loop_learnt) {
 
         // Perform Gauss Jordan
         GaussJordan gj(all_equations, *ring, config.verbosity);
-        gj.run(linear_indices, all_equations);
+        int num_linear = gj.run(&all_equations, NULL);
+        linear_indices.clear();
+        for (size_t i = 0; i < all_equations.size(); i++) {
+            if (all_equations[i].deg() == 1) {
+                linear_indices.push_back(i);
+            }
+        }
+        assert(num_linear == linear_indices.size());
 
         if (config.verbosity >= 3) {
-            cout << "c Processing " << linear_indices.size() << " linear equations "
+            cout << "c Processing " << num_linear << " linear equations "
                  << "in a system with " << all_equations.size() << " equations\n";
+        }
+        if (num_linear == 0) {
+            break;
+        }
+
+        // Create occurrence list for equations involved
+        vector< set<size_t> > el_occ;
+        for (size_t i = 0; i < ring->nVariables(); i++) {
+            el_occ.push_back(set<size_t>());
+        }
+        for (size_t idx = 0; idx < all_equations.size(); idx++) {
+            const BoolePolynomial& poly = all_equations[idx];
+            for (const uint32_t v : poly.usedVariables()) {
+                el_occ[v].insert(idx);
+            }
         }
 
         // Iterate through all linear equations
@@ -615,18 +635,16 @@ int ANF::elimLin(vector<BoolePolynomial>& loop_learnt) {
 
                 // Pick variable which best metric to substitute
                 BooleMonomial from_mono(*ring);
-                BoolePolynomial poly_to_replace(0, *ring);
+                BoolePolynomial to_poly(0, *ring);
                 size_t best_metric = std::numeric_limits<std::size_t>::max();
                 assert(linear_eq.deg() == 1);
                 for (const BooleMonomial& mono : linear_eq) {
                     if (mono != BooleConstant(1)) {
-                        const BoolePolynomial poly = linear_eq - mono;
-                        uint32_t v = mono.firstVariable().index();
-                        size_t metric = occur[v].size();
+                        size_t metric = occur[mono.firstVariable().index()].size();
                         if (metric < best_metric) {
                             best_metric = metric;
                             from_mono = mono;
-                            poly_to_replace = poly;
+                            to_poly = linear_eq - mono;
                         }
                     }
                 }
@@ -634,39 +652,27 @@ int ANF::elimLin(vector<BoolePolynomial>& loop_learnt) {
                 uint32_t var_to_replace = from_mono.firstVariable().index();
                 if (config.verbosity >= 5) {
                     cout << "c Replacing " << linear_eq.firstTerm().firstVariable()
-                         << " with " << poly_to_replace << endl;
+                         << " with " << to_poly << endl;
                 }
 
-                // Run through all equations and replace
-                for (BoolePolynomial& poly : all_equations) {
-                    bool has_var = false;
-                    for (const uint32_t& v : poly.usedVariables()) {
-                        if (v == var_to_replace) {
-                            has_var = true;
-                            break;
-                        }
+                // Eliminate variable from these polynomials
+                set<size_t> to_replace = el_occ[var_to_replace];
+                for (size_t idx : to_replace) {
+                    BoolePolynomial& poly = all_equations[idx];
+
+                    // Remove from el_occ
+                    for (const uint32_t v : poly.usedVariables()) {
+                        set<size_t>::iterator findIt = std::find(el_occ[v].begin(), el_occ[v].end(), idx);
+                        assert(findIt != el_occ[v].end());
+                        el_occ[v].erase(findIt);
                     }
 
-                    // Eliminate variable from this polynomial!
-                    if (has_var) {
-                        BoolePolynomial newpoly(0, *ring);
-                        for (const BooleMonomial& mono : poly) {
-                            BoolePolynomial newmono(1, *ring);
-                            for (const uint32_t& v : mono) {
-                                if (v == var_to_replace) {
-                                    newmono *= poly_to_replace;
-                                } else {
-                                    newmono *= BooleVariable(v, *ring);
-                                }
-                            }
-                            newpoly += newmono;
-                        }
-                        if (config.verbosity >= 5) {
-                            cout << "c EL: " << poly << " => " << newpoly << endl;
-                        }
+                    // Eliminate variable
+                    poly = (poly / from_mono * to_poly) + (poly % from_mono);
 
-                        // Overwrite
-                        poly = newpoly;
+                    // Add back to el_occ
+                    for (const uint32_t v : poly.usedVariables()) {
+                        el_occ[v].insert(idx);
                     }
                 }
             }

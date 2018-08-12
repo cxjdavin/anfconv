@@ -225,5 +225,30 @@ int SimplifyBySat::simplify(vector<BoolePolynomial>& loop_learnt) {
     }
     testSolution(orig_anf, solution);
 
+    if (config.findFirstSolution) {
+        // Write solution
+        std::ofstream ofs;
+        ofs.open(config.solutionOutput.c_str());
+        if (!ofs) {
+            std::cerr << "c Error opening file \"" << config.solutionOutput << "\" for writing\n";
+            exit(-1);
+        } else {
+            size_t num = 0;
+            ofs << "v ";
+            for (const lbool lit : solution) {
+                if (lit != l_Undef) {
+                    ofs << ((lit == l_True) ? "" : "-") << num << " ";
+                }
+                num++;
+            }
+            ofs << endl;
+        }
+        ofs.close();
+        if (config.verbosity >= 2) {
+            cout << "c [Cryptominisat] Solution written to " << config.solutionOutput << endl;
+        }
+        config.foundSolution = true;
+    }
+
     return num_learnt;
 }

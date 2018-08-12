@@ -76,16 +76,16 @@ void parseOptions(int argc, char *argv[]) {
         "Disable limiters on simplification processes.")
     ("nodefault", po::bool_switch(&config.nodefault)->default_value(false),
         "Disables default setting. You now have to manually switch on simplification processes.")
-    ("gjsimp", po::bool_switch(&config.doGJSimplify)->default_value(false),
-        "Simplify using GaussJordan")
     ("xlsimp", po::bool_switch(&config.doXLSimplify)->default_value(false),
         "Simplify using XL (performs GaussJordan internally)")
     ("xldeg", po::value<uint32_t>(&config.xlDeg)->default_value(1),
-        "Expansion degree for XL algorithm. Default = 1 (for now we only support up to xldeg = 3)")
+        "Expansion degree for XL algorithm. Default = 1 (0 = Just GJE. For now we only support 0 <= xldeg = 3)")
     ("elsimp", po::bool_switch(&config.doELSimplify)->default_value(false),
         "Simplify using ElimLin (performs GaussJordan internally)")
     ("satsimp", po::bool_switch(&config.doSATSimplify)->default_value(false),
         "Simplify using SAT")
+    ("findfirstsolution", po::bool_switch(&config.findFirstSolution)->default_value(true),
+        "Stops further simplifications and store solution if SAT simp finds a solution")
     ("confl", po::value<uint64_t>(&config.numConfl)->default_value(100000),
         "Conflict limit for built-in SAT solver. Default = 100000")
     ("onlysat", po::value<uint64_t>(&config.onlySatCutoff)->default_value(2),
@@ -323,6 +323,10 @@ void write_cnf(const ANF* anf, const ANF* learnt) {
             }
         } else {
             ofs << *cnf << endl;
+            ofs << "c INDRA learnt " << learnt->size() << " fact(s)\n";
+            for (const BoolePolynomial& poly : learnt->getEqs()) {
+                ofs << "c " << poly << endl;
+            }
         }
     }
     ofs.close();
@@ -331,17 +335,18 @@ void write_cnf(const ANF* anf, const ANF* learnt) {
 vector<BoolePolynomial>* simplify(ANF* anf, const ANF& orig_anf) {
     double loopStartTime = cpuTime();
     if (!config.nodefault) {
-        config.doGJSimplify = true;
         config.doXLSimplify = true;
         config.doELSimplify = true;
         config.doSATSimplify = true;
+        config.findFirstSolution = true;
     }
     if (config.verbosity >= 1) {
         cout << "c --- Configuration --\n"
-             << "c GJ simp: " << config.doGJSimplify << endl
              << "c XL simp (deg = " << config.xlDeg << "): " << config.doXLSimplify << endl
              << "c EL simp: " << config.doELSimplify << endl
-             << "c SAT simp (confl limit = " << config.numConfl << "): " << config.doSATSimplify << endl
+             << "c SAT simp: " << config.doSATSimplify << endl
+             << "c SAT confl limit: " << config.numConfl << endl
+             << "c Stop simplifying if SAT finds solution? " << (config.findFirstSolution ? "Yes" : "No") << endl
              << "c Cut num: " << config.cutNum << endl
              << "c Karnaugh size: " << config.maxKarnTableSize << endl
              << "c --------------------\n";
@@ -353,8 +358,9 @@ vector<BoolePolynomial>* simplify(ANF* anf, const ANF& orig_anf) {
     bool changed = true;
     uint32_t numIters = 0;
     uint64_t onlySat = 0;
+    config.foundSolution = false;
     vector<BoolePolynomial> loop_learnt;
-    while (changed && anf->getOK() && onlySat < config.onlySatCutoff) {
+    while (changed && anf->getOK() && onlySat < config.onlySatCutoff && !config.foundSolution) {
         changed = false;
         uint64_t initial_set_vars = anf->getNumSetVars();
         uint64_t initial_eq_num = anf->size();
@@ -362,34 +368,6 @@ vector<BoolePolynomial>* simplify(ANF* anf, const ANF& orig_anf) {
         uint64_t initial_deg = anf->deg();
         uint64_t initial_simp_xors = anf->getNumSimpleXors();
         uint64_t initial_replaced_vars = anf->getNumReplacedVars();
-
-        // Apply Gauss Jordan simplification
-        if (config.doGJSimplify) {
-            double startTime = cpuTime();
-            int num_learnt = 0;
-            if (!config.nolimiters &&
-                anf->size() * anf->numUniqueMonoms(anf->getEqs()) > 10000000) {
-                if (config.verbosity >= 3) {
-                    cout << "c Matrix has over 10 million cells. Skip GJE\n";
-                }
-            } else {
-                GaussJordan gj(anf->getEqs(), anf->getRing(), config.verbosity);
-                vector<BoolePolynomial> truths_from_gj;
-                gj.run(truths_from_gj);
-                for(BoolePolynomial poly : truths_from_gj) {
-                    loop_learnt.push_back(poly);
-                    num_learnt += anf->addLearntBoolePolynomial(poly);
-                }
-            }
-            if (config.verbosity >= 2) {
-                cout << "c [Gauss Jordan] learnt " << num_learnt << " new facts in "
-                     << (cpuTime() - startTime) << " seconds." << endl;
-            }
-            if (num_learnt != 0) {
-                changed = true;
-                anf->propagate();
-            }
-        }
 
         // Apply XL simplification (includes Gauss Jordan)
         if (config.doXLSimplify) {
@@ -405,7 +383,7 @@ vector<BoolePolynomial>* simplify(ANF* anf, const ANF& orig_anf) {
             }
         }
 
-        // Apply ElimLin simplification (includes Gauss Jordan)
+        // Apply ElimLin simplification
         if (config.doELSimplify) {
             double startTime = cpuTime();
             int num_learnt = anf->elimLin(loop_learnt);

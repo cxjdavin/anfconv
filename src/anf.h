@@ -34,6 +34,7 @@ SOFTWARE.
 #include <set>
 #include <stdint.h>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "configdata.h"
@@ -54,6 +55,7 @@ using std::map;
 using std::pair;
 using std::set;
 using std::string;
+using std::unordered_set;
 using std::vector;
 
 class ANF {

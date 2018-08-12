@@ -49,15 +49,16 @@ struct ConfigData {
     // Processes
     bool nolimiters;
     bool nodefault;
-    bool doGJSimplify;
     bool doXLSimplify;
     bool doELSimplify;
     bool doSATSimplify;
+    bool findFirstSolution;
     uint32_t xlDeg;
     uint64_t numConfl;
     uint64_t onlySatCutoff;
 
     // Solve processed CNF
+    bool foundSolution;
     bool doSolveSAT;
     string solverExe;
     string solutionOutput;
