@@ -55,6 +55,7 @@ class CNF {
         uint64_t getNumAllClauses() const;
 
         friend std::ostream& operator<<(std::ostream& os, const CNF& cnf);
+        void print_without_header(std::ostream& os) const;
 
     private:
         void addTrivialEquations();
@@ -92,21 +93,20 @@ class CNF {
         size_t addedAsCNF = 0;
 };
 
-inline std::ostream& operator<<(std::ostream& os, const CNF& cnf) {
-    os << "p cnf " << cnf.getNumVars() << " " << cnf.getNumAllClauses() << std::endl;
-
-    for(vector<pair<vector<Clause>, BoolePolynomial> >::const_iterator it = cnf.clauses.begin(), end = cnf.clauses.end(); it != end; it++) {
+inline void CNF::print_without_header(std::ostream& os) const {
+    for(vector<pair<vector<Clause>, BoolePolynomial> >::const_iterator it = clauses.begin(), end = clauses.end(); it != end; it++) {
         const vector<Clause>& clauses = it->first;
         for (vector<Clause>::const_iterator it2 = clauses.begin(), end2 = clauses.end(); it2 != end2; it2++) {
             os << *it2 << std::endl;
         }
         os << "c " << it->second << std::endl;
-        os << "c ------------";
-        if (it+1 != cnf.clauses.end()) {
-            os << std::endl;
-        }
+        os << "c ------------\n";
     }
+}
 
+inline std::ostream& operator<<(std::ostream& os, const CNF& cnf) {
+    os << "p cnf " << cnf.getNumVars() << " " << cnf.getNumAllClauses() << std::endl;
+    cnf.print_without_header(os);
     return os;
 }
 

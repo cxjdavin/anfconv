@@ -315,19 +315,14 @@ void write_cnf(const ANF* anf, const ANF* learnt) {
             while(std::getline(ifs, temp)) {
                 ofs << temp << endl;
             }
-            CNF* learnt_cnf = anf_to_cnf(learnt);
-            ofs << "c Adding " << learnt->size() << " fact(s) from indra\n";
-            ofs << *learnt_cnf;
-            if (config.verbosity >= 1) {
-                cout << "c " << learnt->size() << " fact(s) augmented to CNF.\n";
-            }
-        } else {
-            ofs << *cnf << endl;
-            ofs << "c INDRA learnt " << learnt->size() << " fact(s)\n";
-            for (const BoolePolynomial& poly : learnt->getEqs()) {
-                ofs << "c " << poly << endl;
-            }
         }
+        ofs << "c Internal representation\n";
+        ofs << *cnf << endl;
+        ofs << "c INDRA learnt " << learnt->size() << " fact(s)\n";
+        for (const BoolePolynomial& poly : learnt->getEqs()) {
+            ofs << "c " << poly << endl;
+        }
+//        }
     }
     ofs.close();
 }
@@ -428,7 +423,44 @@ vector<BoolePolynomial>* simplify(ANF* anf, const ANF& orig_anf) {
         changed |= (anf->getNumReplacedVars() != initial_replaced_vars);
         numIters++;
     }
+
+    // Add learnt
     vector<BoolePolynomial>* all_learnt = anf->contextualizedLearnt(loop_learnt);
+
+    // Add assignments and equivalences
+    const vector<BoolePolynomial>& orig_eqs = orig_anf.getEqs();
+    for (uint32_t v = 0; v < anf->getRing().nVariables(); v++) {
+        const lbool val = anf->value(v);
+        const Lit lit = anf->getReplaced(v);
+        BooleVariable bv = anf->getRing().variable(v);
+        if (val != l_Undef) {
+            BoolePolynomial assignment(bv + BooleConstant(val == l_True));
+            bool is_new = true;
+            for (const size_t idx : orig_anf.getOccur()[v]) {
+                const BoolePolynomial& known = orig_eqs[idx];
+                if (known == assignment) {
+                    is_new = false;
+                }
+            }
+            if (is_new) {
+                all_learnt->push_back(assignment);
+            }
+        } else if (lit != Lit(v, false)) {
+            BooleVariable bv2 = anf->getRing().variable(lit.var());
+            BoolePolynomial equivalence(bv + bv2 + BooleConstant(lit.sign()));
+            bool is_new = true;
+            for (const size_t idx : orig_anf.getOccur()[v]) {
+                const BoolePolynomial& known = orig_eqs[idx];
+                if (known == equivalence) {
+                    is_new = false;
+                }
+            }
+            if (is_new) {
+                all_learnt->push_back(equivalence);
+            }
+        }
+    }
+    
     if (config.verbosity >= 2) {
         cout << "c [Loop terminated after " << numIters << " iteration(s) in "
              << (cpuTime() - loopStartTime) << " seconds.]\n";
